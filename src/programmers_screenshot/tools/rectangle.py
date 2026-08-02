@@ -38,12 +38,11 @@ class RectangleTool(Tool):
         self._start = None
         self._end = None
 
-    def preview(self, cr, canvas):
+    def pending_region(self):
+        """The overlay draws this for us, under the annotations."""
         if self._start is None:
-            return
-        rect = Rect.from_points(self._start, self._end)
-        if rect:
-            painting.draw_region(cr, canvas, rect)
+            return None
+        return Rect.from_points(self._start, self._end) or None
 
     def bounds(self):
         if self._start is None:

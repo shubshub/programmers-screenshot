@@ -337,8 +337,11 @@ class Overlay:
         painting.use(cr, theme.SCREEN_DIM)
         cr.paint()
 
-        if self.scene.region is not None:
-            painting.draw_region(cr, canvas, self.scene.region)
+        # A region being dragged out stands in for the committed one, so that
+        # only one area is ever undimmed and the annotations stay on top of it.
+        region = self.active_tool.pending_region() or self.scene.region
+        if region is not None:
+            painting.draw_region(cr, canvas, region)
 
         for item in self.scene.items:
             item.draw(cr)
