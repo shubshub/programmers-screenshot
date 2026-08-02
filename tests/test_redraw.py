@@ -212,6 +212,26 @@ def main():
         wrong = screen.differences_from_full_repaint()
         check("%s matches a full repaint" % shape, not wrong, describe(wrong))
 
+    check.section("dragging a step badge into place leaves nothing behind")
+    from programmers_screenshot.tools.step import SIZE  # noqa: E402
+
+    h = Harness(pixbuf, bounds)
+    screen = Screen(h, bounds)
+    screen.prime()
+    h.use_tool("step")
+    h.overlay.values.set(COLOUR, (0.85, 0.1, 0.1))
+    h.overlay.values.set(SIZE, 21)
+    for placed in range(3):  # a few already on the scene, then drag another
+        h.click(x + placed * 80, y)
+    screen.flush()
+    h.press(x, y + 200)
+    screen.flush()
+    for step in range(1, 20):
+        h.move(x + step * 40, y + 200 + step * 12)
+        screen.flush()
+    wrong = screen.differences_from_full_repaint()
+    check("matches a full repaint", not wrong, describe(wrong))
+
     check.section("drawing inside an existing region")
     h = Harness(pixbuf, bounds)
     screen = Screen(h, bounds)

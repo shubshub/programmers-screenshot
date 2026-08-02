@@ -17,8 +17,9 @@ from .items import Arrow, Ellipse, Item, Line, Shape, Stroke
 from .line import LineTool
 from .pen import PenTool
 from .rectangle import RectangleTool
+from .step import StepTool
 
-ALL_TOOLS = (RectangleTool, PenTool, LineTool)
+ALL_TOOLS = (RectangleTool, PenTool, LineTool, StepTool)
 
 __all__ = [
     "ALL_TOOLS",

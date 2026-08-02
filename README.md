@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.6.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.7.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.6.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.7.0_all.deb
 ```
 
 ## Bind it to a key
@@ -81,6 +81,7 @@ screen.
 | Region | Drag to set what gets captured; click to clear it | — |
 | Pen | Draw freehand on the frozen screen | Colour, thickness |
 | Line | Straight lines, outlined circles and arrows | Shape, colour, thickness |
+| Step | Click to drop numbered badges: 1, 2, 3… | Size, colour |
 
 Tools that have settings get a second toolbar row underneath the first, holding
 just their own options. Setting values are shared by key, so the colour and
@@ -167,6 +168,7 @@ src/programmers_screenshot/
         rectangle.py              the region tool
         pen.py                    freehand drawing
         line.py                   lines, circles and arrows
+        step.py                   numbered step badges
         __init__.py               ALL_TOOLS — the registry
     output.py                     saving and clipboard
     notifications.py              the notification and its buttons
@@ -259,6 +261,7 @@ to a core module to pass, the framework has stopped doing its job.
 python3 tests/test_framework.py       # scene, settings, tools, adding a tool
 python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
 python3 tests/test_line_tool.py       # lines, circles, arrows and Shift
+python3 tests/test_step_tool.py       # numbered badges and undo renumbering
 python3 tests/test_redraw.py          # partial redraws leave no stale pixels
 python3 tests/test_notifications.py   # notification wiring and agent handoff
 python3 tests/test_sound.py           # the sound asset, generator and playback
