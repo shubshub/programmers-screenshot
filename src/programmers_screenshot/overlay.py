@@ -32,12 +32,17 @@ def _shift_held(event):
 
 
 class Canvas:
-    """What a tool needs in order to paint itself onto the overlay."""
+    """What a tool needs in order to paint itself onto the overlay.
 
-    def __init__(self, surface, bounds, scale):
+    The scene is here so a preview can depend on what has already been placed
+    — a step counter has to show the number it is about to take.
+    """
+
+    def __init__(self, surface, bounds, scale, scene):
         self.surface = surface
         self.bounds = bounds
         self.scale = scale
+        self.scene = scene
 
 
 class Overlay:
@@ -177,7 +182,7 @@ class Overlay:
         self.window.destroy()
 
     def canvas(self):
-        return Canvas(self.surface, self.bounds, self.scale)
+        return Canvas(self.surface, self.bounds, self.scale, self.scene)
 
     # -- intent ------------------------------------------------------------
 
