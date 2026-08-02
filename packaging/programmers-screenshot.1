@@ -1,0 +1,124 @@
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.4.0" "User Commands"
+.SH NAME
+programmers\-screenshot \- region screenshot tool for hotkey binding
+.SH SYNOPSIS
+.B programmers\-screenshot
+.RI [ OPTIONS ]
+.SH DESCRIPTION
+Freezes the screen and dims it, then puts a toolbar across the top of the
+monitor you are working on. Pick a tool, mark out what you want, and press
+.B Capture
+in the top right corner. The result is copied to the clipboard and written as
+a timestamped PNG to
+.IR ~/Pictures/Screenshots ,
+whose path is printed to standard output.
+.PP
+Nothing is captured until you say so, so a selection can be redrawn as many
+times as you like first.
+.SH SOUND
+A shutter sound plays as the shot is taken, using the first of
+.BR canberra\-gtk\-play (1),
+.BR paplay (1),
+.BR pw\-play (1)
+or
+.BR aplay (1)
+that is installed. With none of them the capture is silent and nothing else
+changes. The desktop's own event-sounds setting is honoured, and
+.B \-\-no\-sound
+suppresses it for one invocation.
+.SH NOTIFICATION
+The notification shown afterwards carries two buttons:
+.TP
+.B Open Image
+Opens the PNG in whatever handles images.
+.TP
+.B Show in Folder
+Opens the containing folder with the file selected, via the
+.B org.freedesktop.FileManager1
+interface. Without a file manager on the bus it falls back to opening the
+folder itself.
+.PP
+GNOME collapses notifications that carry buttons, so the two may sit behind
+the notification's expander arrow rather than being visible immediately.
+.PP
+Buttons need a process alive to receive the click, but the command itself
+exits at once so shell pipelines do not block. The notification is therefore
+owned by a short-lived detached helper, which exits when the notification is
+dismissed, when a button is pressed, or after five minutes.
+.SH TOOLS
+.TP
+.B Rectangle
+Click and drag to mark out a rectangular region. Dragging again replaces the
+selection; a single click clears it.
+.SH INTERFACE
+.TP
+.B Capture
+Top right. Enabled once something is selected.
+.TP
+.B ✕
+Left of Capture. Closes without capturing.
+.TP
+.B Enter
+Same as pressing Capture.
+.TP
+.B Escape ", right click"
+Cancel. Nothing is written and the exit status is 1.
+.PP
+The toolbar is not a drawing surface, so a selection cannot be *started*
+underneath it. Dragging upwards from below into the toolbar strip does still
+select it, which is how you capture the top edge of the screen.
+.SH OPTIONS
+.TP
+.BR \-f ", " \-\-full
+Capture the entire screen immediately, skipping the overlay entirely.
+.TP
+.BR \-o ", " \-\-output " " \fIFILE\fR
+Write the PNG to \fIFILE\fR instead of a timestamped name.
+.TP
+.BR \-d ", " \-\-directory " " \fIDIR\fR
+Save into \fIDIR\fR instead of the default directory.
+.TP
+.B \-\-no\-clipboard
+Do not touch the clipboard.
+.TP
+.B \-\-no\-save
+Do not write a file; copy to the clipboard only.
+.TP
+.B \-\-no\-sound
+Do not play the shutter sound.
+.TP
+.BR \-\-install\-hotkey " [" \fIACCEL\fR ]
+Register a GNOME custom shortcut that runs this command. \fIACCEL\fR is a
+GTK accelerator string and defaults to \fB<Shift><Super>s\fR.
+.TP
+.B \-\-uninstall\-hotkey
+Remove the shortcut registered by \fB\-\-install\-hotkey\fR.
+.TP
+.B \-\-version
+Print the version and exit.
+.SH EXIT STATUS
+.TP
+.B 0
+A screenshot was captured and delivered.
+.TP
+.B 1
+The capture was cancelled, or the screen could not be read.
+.TP
+.B 2
+The options given were contradictory.
+.SH FILES
+.TP
+.I ~/Pictures/Screenshots
+Default output directory, created on first use.
+.SH NOTES
+Under X11 the screen is captured directly from the root window. Under Wayland
+it goes through the
+.B org.gnome.Shell.Screenshot
+D\-Bus interface, so a GNOME session is required there.
+.PP
+The overlay spans every monitor, so a selection may cross screen boundaries.
+The toolbar itself is placed on whichever monitor the pointer was on when the
+tool started.
+.SH SEE ALSO
+.BR xclip (1),
+.BR wl\-copy (1)

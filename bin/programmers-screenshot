@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Launcher: find the package, then hand over to the CLI.
+
+The same file works from a source checkout (../src) and from the installed
+location (/usr/share/programmers-screenshot).
+"""
+
+import os
+import sys
+
+_HERE = os.path.dirname(os.path.realpath(__file__))
+_PREFIX = os.path.join(_HERE, os.pardir)
+_CANDIDATES = (
+    os.path.join(_PREFIX, "src"),  # source checkout
+    os.path.join(_PREFIX, "share", "programmers-screenshot"),  # installed
+    "/usr/share/programmers-screenshot",
+)
+
+for candidate in _CANDIDATES:
+    if os.path.isdir(os.path.join(candidate, "programmers_screenshot")):
+        sys.path.insert(0, os.path.abspath(candidate))
+        break
+else:
+    sys.exit("programmers-screenshot: cannot locate the programmers_screenshot package")
+
+from programmers_screenshot.cli import main  # noqa: E402
+
+sys.exit(main())
