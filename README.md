@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.5.1_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.6.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.5.1_all.deb
+sudo apt install ./dist/programmers-screenshot_0.6.0_all.deb
 ```
 
 ## Bind it to a key
@@ -80,10 +80,14 @@ screen.
 | --- | --- | --- |
 | Region | Drag to set what gets captured; click to clear it | — |
 | Pen | Draw freehand on the frozen screen | Colour, thickness |
+| Line | Straight lines, outlined circles and arrows | Shape, colour, thickness |
 
 Tools that have settings get a second toolbar row underneath the first, holding
-just their own options. Setting values are shared by key, so a colour picked for
-the pen is the colour a future arrow tool would use too.
+just their own options. Setting values are shared by key, so the colour and
+thickness you pick for the pen are the ones the line tool uses too.
+
+Hold <kbd>Shift</kbd> while dragging to constrain: the region and the circle go
+square, lines and arrows snap to 45° angles.
 
 ## Options
 
@@ -158,17 +162,18 @@ src/programmers_screenshot/
     actions.py                    the undoable changes a tool can make
     settings.py                   Setting types and their shared values
     tools/
-        base.py                   Tool and ShapeTool
+        base.py                   Tool, DragTool and ShapeTool
         items.py                  Item, and the shapes that get drawn
         rectangle.py              the region tool
         pen.py                    freehand drawing
+        line.py                   lines, circles and arrows
         __init__.py               ALL_TOOLS — the registry
     output.py                     saving and clipboard
     notifications.py              the notification and its buttons
     hotkey.py                     GNOME shortcut registration
     sound.py                      playing the shutter sound
     paths.py                      where this program and its assets live
-    geometry.py                   Rect
+    geometry.py                   Rect, and drag constraint helpers
     painting.py                   shared cairo helpers
     theme.py                      every colour and measurement
 packaging/                        control, desktop entry, icon, man page, sound
@@ -179,8 +184,14 @@ build.sh                          assembles the tree and runs dpkg-deb
 
 ### Adding a tool
 
-Two steps. Most tools are "drag from A to B and leave a shape behind", and those
-subclass `ShapeTool`, where the only method you have to write is `make_item()`.
+Nearly every tool is the same gesture — press, drag, and on release something
+is set. `DragTool` owns that: where the drag started, where it is now, and the
+settings it began with. A subclass says only what a finished drag *means*
+(`complete`), what it looks like on the way (`draw_drag`), and how much of the
+screen it touches (`drag_extent`).
+
+Most tools leave a shape behind, and those want `ShapeTool` — a thin layer over
+`DragTool` where the only method you write is `make_item()`.
 
 **1.** Write the file. Here is an arrow tool, in full:
 
@@ -226,9 +237,17 @@ the undo entry and inclusion in the captured image all follow with no other
 edits. `icon_text` is a plain glyph so you don't have to write cairo for a
 button; override `draw_icon()` if you want to.
 
-For anything that isn't a simple drag — freehand, multi-click, click-to-place —
-subclass `Tool` instead and handle `begin`/`extend`/`finish` yourself, returning
-an `Item` (or an `Action`) at the end. `pen.py` is the worked example.
+A drag that sets something other than an annotation subclasses `DragTool`
+directly and returns an `Action` from `complete()` — `rectangle.py` does that,
+returning a `SetRegion`. Only for gestures that are not drags at all — multi
+click, click-to-place — reach for `Tool` and handle `begin`/`extend`/`finish`
+yourself; `pen.py` is the worked example, since freehand needs every point
+rather than just two.
+
+Two things to get right in a new shape: `Item.bounds()` must cover everything
+`draw()` paints, stroke overhang and all, because partial redraws trust it; and
+`constrain()` decides what <kbd>Shift</kbd> does, with `square_corner()` and
+`snap_to_45()` in `geometry.py` covering the usual cases.
 
 This is enforced, not just documented: `tests/test_framework.py` defines a tool
 inside the test file and drives it end to end. If that test ever needs a change
@@ -239,6 +258,7 @@ to a core module to pass, the framework has stopped doing its job.
 ```bash
 python3 tests/test_framework.py       # scene, settings, tools, adding a tool
 python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
+python3 tests/test_line_tool.py       # lines, circles, arrows and Shift
 python3 tests/test_redraw.py          # partial redraws leave no stale pixels
 python3 tests/test_notifications.py   # notification wiring and agent handoff
 python3 tests/test_sound.py           # the sound asset, generator and playback

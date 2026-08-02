@@ -21,13 +21,13 @@ class PenTool(Tool):
         self._points = [point]
         self._values = values
 
-    def extend(self, point):
+    def extend(self, point, shift=False):
         # Skip repeats: motion events outnumber actual movement.
         if self._points and point == self._points[-1]:
             return
         self._points.append(point)
 
-    def finish(self, point):
+    def finish(self, point, shift=False):
         if not self._points:
             return None
         self.extend(point)

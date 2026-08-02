@@ -26,6 +26,11 @@ GRAB_ATTEMPTS = 20
 DAMAGE_MARGIN = 8  # px of slack round a partial redraw
 
 
+def _shift_held(event):
+    """Whether Shift was down for a pointer event, which constrains a drag."""
+    return bool(event.state & Gdk.ModifierType.SHIFT_MASK)
+
+
 class Canvas:
     """What a tool needs in order to paint itself onto the overlay."""
 
@@ -260,7 +265,7 @@ class Overlay:
         self.pointer = (event.x, event.y)
 
         if self._dragging:
-            self.active_tool.extend((event.x, event.y))
+            self.active_tool.extend((event.x, event.y), _shift_held(event))
             self._redraw_gesture()
             return True
 
@@ -301,7 +306,9 @@ class Overlay:
 
         if self._dragging:
             self._dragging = False
-            self.scene.do(self.active_tool.finish((event.x, event.y)))
+            self.scene.do(
+                self.active_tool.finish((event.x, event.y), _shift_held(event))
+            )
             self._last_damage = None
             widget.queue_draw()
         return True
