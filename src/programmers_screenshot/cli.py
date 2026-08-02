@@ -14,7 +14,7 @@ from . import capture, hotkey, notifications, output, tools
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1
@@ -24,9 +24,8 @@ EXIT_BAD_USAGE = 2
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="programmers-screenshot",
-        description="Select a screen region with the rectangle tool, then hit "
-        "Capture. The result goes to the clipboard and to "
-        "~/Pictures/Screenshots.",
+        description="Mark out a screen region, draw on it, then hit Capture. "
+        "The result goes to the clipboard and to ~/Pictures/Screenshots.",
     )
     parser.add_argument(
         "-f", "--full", action="store_true",
@@ -96,21 +95,21 @@ def main(argv=None):
         output.deliver(pixbuf, options)
         return EXIT_OK
 
-    region = select_region(pixbuf, bounds)
-    if region is None:
+    captured = run_overlay(pixbuf, bounds)
+    if captured is None:
         return EXIT_CANCELLED
 
-    output.deliver(region, options)
+    output.deliver(captured, options)
     return EXIT_OK
 
 
-def select_region(pixbuf, bounds):
-    """Run the overlay and return the cropped pixbuf, or None if cancelled."""
-    overlay = Overlay(pixbuf, bounds, tools.build_tools())
-    rect = overlay.run()
-    if rect is None:
-        return None
-    return capture.crop(pixbuf, rect, overlay.scale)
+def run_overlay(pixbuf, bounds):
+    """Run the overlay and return the captured pixbuf, or None if cancelled.
+
+    The overlay renders it rather than returning a rectangle to crop, because
+    only it knows about the annotations that have to be baked in.
+    """
+    return Overlay(pixbuf, bounds, tools.build_tools()).run()
 
 
 def cairo_is_usable():

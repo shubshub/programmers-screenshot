@@ -3,12 +3,13 @@
 A minimal region screenshot tool for Ubuntu, built to sit on a single keypress.
 
 Press the hotkey and the screen freezes and dims, with a toolbar across the top.
-Pick a tool, mark out what you want, then hit **Capture** in the top right. The
-region lands on your clipboard and in `~/Pictures/Screenshots` as a timestamped
+Mark out a region, scribble on it, then hit **Capture** in the top right. The
+result lands on your clipboard and in `~/Pictures/Screenshots` as a timestamped
 PNG. No editor, no dialogs, no upload prompts.
 
-Nothing is captured until you press Capture, so you can redraw the selection as
-many times as you like first.
+Nothing is captured until you press Capture, so you can redraw as many times as
+you like first — and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back whatever you last
+did.
 
 A shutter sound fires as the shot is taken. The notification that follows has
 two buttons: **Open Image** opens the PNG, and **Show in Folder** opens the
@@ -20,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.4.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.5.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.4.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.5.0_all.deb
 ```
 
 ## Bind it to a key
@@ -55,23 +56,34 @@ screen) and `<Alt>Print` (window), so pick something else or rebind those first.
 
 | Input | Result |
 | --- | --- |
-| Drag on the screen | Mark out a region with the active tool |
+| Drag on the screen | Use the active tool |
 | **Capture**, or <kbd>Enter</kbd> | Take the shot |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | Undo / redo |
 | **✕**, <kbd>Esc</kbd>, or right-click | Close without capturing |
-| Single click | Clear the selection |
+| <kbd>Esc</kbd> mid-drag | Abandon just that stroke |
 
-Capture stays disabled until something is selected. The selection shows a live
-pixel-size readout. Cancelling exits with status 1, so it composes in scripts.
+**The region is optional.** With one marked out, Capture takes that; with none,
+it takes the whole screen — the same thing `--full` does. So you can go straight
+to drawing without marking anything out first. A plain click with the region
+tool clears the region again.
 
-The toolbar is not a drawing surface, so you can't *start* a selection under it
-— but dragging upwards into it works, which is how you grab the top edge of the
+The region shows a live pixel-size readout. Cancelling exits with status 1, so
+it composes in scripts.
+
+The toolbar is not a drawing surface, so you can't *start* a drag under it — but
+dragging upwards into it works, which is how you grab the top edge of the
 screen.
 
 ### Tools
 
-| Tool | Does |
-| --- | --- |
-| Rectangle | Click and drag to select a rectangular region |
+| Tool | Does | Settings |
+| --- | --- | --- |
+| Region | Drag to set what gets captured; click to clear it | — |
+| Pen | Draw freehand on the frozen screen | Colour, thickness |
+
+Tools that have settings get a second toolbar row underneath the first, holding
+just their own options. Setting values are shared by key, so a colour picked for
+the pen is the colour a future arrow tool would use too.
 
 ## Options
 
@@ -141,8 +153,16 @@ src/programmers_screenshot/
     cli.py                        argument parsing and the top-level flow
     capture.py                    reading pixels (X11 root, or GNOME D-Bus)
     overlay.py                    the modal window: events, drawing, grabs
-    toolbar.py                    bar layout, hit testing, button drawing
-    tools.py                      Tool base class + RectangleTool
+    toolbar.py                    both bar rows: layout, hit testing, drawing
+    scene.py                      region + annotations, and undo/redo
+    actions.py                    the undoable changes a tool can make
+    settings.py                   Setting types and their shared values
+    tools/
+        base.py                   Tool and ShapeTool
+        items.py                  Item, and the shapes that get drawn
+        rectangle.py              the region tool
+        pen.py                    freehand drawing
+        __init__.py               ALL_TOOLS — the registry
     output.py                     saving and clipboard
     notifications.py              the notification and its buttons
     hotkey.py                     GNOME shortcut registration
@@ -159,18 +179,70 @@ build.sh                          assembles the tree and runs dpkg-deb
 
 ### Adding a tool
 
-Write a `Tool` subclass in `tools.py` and add it to `ALL_TOOLS`. The toolbar
-button, its icon slot, and the event routing all come for free — a tool only
-has to handle `press`/`drag`/`release`, draw itself, and report a `selection()`.
+Two steps. Most tools are "drag from A to B and leave a shape behind", and those
+subclass `ShapeTool`, where the only method you have to write is `make_item()`.
+
+**1.** Write the file. Here is an arrow tool, in full:
+
+```python
+# src/programmers_screenshot/tools/arrow.py
+from .base import ShapeTool
+from .items import Item
+from ..settings import COLOUR, WIDTH
+
+
+class Arrow(Item):
+    def __init__(self, start, end, colour, width):
+        self.start, self.end = start, end
+        self.colour, self.width = colour, width
+
+    def draw(self, cr):
+        cr.set_source_rgb(*self.colour)
+        cr.set_line_width(self.width)
+        cr.move_to(*self.start)
+        cr.line_to(*self.end)
+        cr.stroke()
+        # ...and the head
+
+
+class ArrowTool(ShapeTool):
+    name = "arrow"
+    label = "Arrow"
+    icon_text = "↗"
+    settings = (COLOUR, WIDTH)
+
+    def make_item(self, start, end, values):
+        return Arrow(start, end, values["colour"], values["width"])
+```
+
+**2.** Add it to the registry in `tools/__init__.py`:
+
+```python
+ALL_TOOLS = (RectangleTool, PenTool, ArrowTool)
+```
+
+That is the whole job. The toolbar button, the settings row, the live preview,
+the undo entry and inclusion in the captured image all follow with no other
+edits. `icon_text` is a plain glyph so you don't have to write cairo for a
+button; override `draw_icon()` if you want to.
+
+For anything that isn't a simple drag — freehand, multi-click, click-to-place —
+subclass `Tool` instead and handle `begin`/`extend`/`finish` yourself, returning
+an `Item` (or an `Action`) at the end. `pen.py` is the worked example.
+
+This is enforced, not just documented: `tests/test_framework.py` defines a tool
+inside the test file and drives it end to end. If that test ever needs a change
+to a core module to pass, the framework has stopped doing its job.
 
 ### Tests
 
 ```bash
-python3 tests/test_interaction.py     # overlay: select, confirm, cancel
+python3 tests/test_framework.py       # scene, settings, tools, adding a tool
+python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
 python3 tests/test_notifications.py   # notification wiring and agent handoff
 python3 tests/test_sound.py           # the sound asset, generator and playback
 ```
 
 They run against a real display but never show a window, and never make a
-noise. The two notification actions talk to the desktop, so they are left to
-manual testing.
+noise. `tests/support.py` holds the shared harness. The two notification
+actions talk to the desktop, so they are left to manual testing.

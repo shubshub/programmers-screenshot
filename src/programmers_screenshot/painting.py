@@ -1,8 +1,9 @@
-"""Small cairo helpers shared by the toolbar and the tools."""
+"""Small cairo helpers shared by the toolbar, the settings and the tools."""
 
 import math
 
 from . import theme
+from .geometry import Rect
 
 
 def use(cr, colour):
@@ -28,6 +29,19 @@ def fill_rounded(cr, rect, colour, radius=theme.CORNER_RADIUS):
     use(cr, colour)
     rounded_rect(cr, rect, radius)
     cr.fill()
+
+
+def circle(cr, x, y, radius, colour):
+    use(cr, colour)
+    cr.arc(x, y, radius, 0, 2 * math.pi)
+    cr.fill()
+
+
+def circle_outline(cr, x, y, radius, colour, line_width):
+    use(cr, colour)
+    cr.set_line_width(line_width)
+    cr.arc(x, y, radius, 0, 2 * math.pi)
+    cr.stroke()
 
 
 def select_font(cr, family, size):
@@ -57,3 +71,63 @@ def draw_text_centred(cr, text, rect, colour):
         rect.y + (rect.height - height) / 2,
         colour,
     )
+
+
+# --------------------------------------------------------------------------
+# the capture region
+#
+# Drawn both for the committed region and for the one being dragged out, so it
+# lives here rather than in either caller.
+# --------------------------------------------------------------------------
+
+
+def draw_region(cr, canvas, rect):
+    reveal(cr, canvas, rect)
+    region_outline(cr, rect)
+    size_label(cr, canvas, rect)
+
+
+def reveal(cr, canvas, rect):
+    """Undim the region by repainting the frozen screen inside it."""
+    cr.save()
+    cr.rectangle(rect.x, rect.y, rect.width, rect.height)
+    cr.clip()
+    cr.set_source_surface(canvas.surface, 0, 0)
+    cr.paint()
+    cr.restore()
+
+
+def region_outline(cr, rect):
+    use(cr, theme.ACCENT)
+    cr.set_line_width(1.0)
+    cr.rectangle(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1)
+    cr.stroke()
+
+    half = theme.HANDLE_SIZE / 2
+    for cx, cy in rect.corners:
+        cr.rectangle(cx - half, cy - half, theme.HANDLE_SIZE, theme.HANDLE_SIZE)
+    cr.fill()
+
+
+def size_label(cr, canvas, rect):
+    """Pixel dimensions, above the region, or tucked inside if there is no
+    room above."""
+    pixels = rect.scaled(canvas.scale).rounded()
+    text = "%d × %d" % (pixels.width, pixels.height)
+    select_font(cr, theme.FONT_MONO, theme.FONT_SIZE_LABEL)
+    width, height = text_size(cr, text)
+
+    pad_x, pad_y = 8, 5
+    box = Rect(rect.x, rect.y - height - pad_y * 2 - 6,
+               width + pad_x * 2, height + pad_y * 2)
+    if box.y < canvas.bounds.y:
+        box = Rect(box.x, rect.y + 6, box.width, box.height)
+    box = Rect(
+        min(max(box.x, 0), max(0, canvas.bounds.width - box.width)),
+        min(max(box.y, 0), max(0, canvas.bounds.height - box.height)),
+        box.width,
+        box.height,
+    )
+
+    fill_rounded(cr, box, theme.LABEL_BG, 4)
+    draw_text(cr, text, box.x + pad_x, box.y + pad_y, theme.LABEL_TEXT)

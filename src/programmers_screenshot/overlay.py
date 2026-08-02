@@ -1,10 +1,12 @@
-"""The full-screen overlay: a frozen screenshot you draw a selection on.
+"""The full-screen overlay: a frozen screenshot you mark up and then capture.
 
 The screen is captured before this window appears and painted back as the
 background, so menus and animations hold still while you work. Nothing is
-captured until the Capture button (or Enter) says so.
+captured until the Capture button (or Enter) says so; until then the tools
+just build up a scene.
 """
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -13,17 +15,28 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 from . import capture, painting, theme, toolbar as toolbar_module
-from .geometry import Rect
-from .tools import Canvas
+from .geometry import Rect, union
+from .scene import Scene
+from .settings import SettingValues
 
-HINT = "Drag to select  ·  Enter or Capture to take it  ·  Esc to cancel"
+HINT = "Drag to mark a region  ·  Enter or Capture takes it  ·  Esc to cancel"
 
 GRAB_RETRY_MS = 50
 GRAB_ATTEMPTS = 20
+DAMAGE_MARGIN = 8  # px of slack round a partial redraw
+
+
+class Canvas:
+    """What a tool needs in order to paint itself onto the overlay."""
+
+    def __init__(self, surface, bounds, scale):
+        self.surface = surface
+        self.bounds = bounds
+        self.scale = scale
 
 
 class Overlay:
-    """Runs a modal selection session and returns the chosen Rect, or None."""
+    """Runs a modal session and returns the captured pixbuf, or None."""
 
     def __init__(self, pixbuf, bounds, tools):
         self.pixbuf = pixbuf
@@ -32,18 +45,22 @@ class Overlay:
 
         self.tools = tools
         self.active_tool = tools[0]
+        self.scene = Scene()
+        self.values = SettingValues()
+
         self.result = None
-        self.surface = None
+        self._surface = None
         self.pointer = None
         self._dragging = False
         self._pressed_button = None
+        self._last_damage = None
         self._grab_attempts = 0
 
         self.window = self._build_window()
-        # Everything chrome-related lives on one monitor: the one the pointer
-        # was on when the hotkey fired, which is where the user is looking.
+        # Chrome lives on one monitor: the one the pointer was on when the
+        # hotkey fired, which is where the user is looking.
         self.monitor = self._active_monitor()
-        self.toolbar = toolbar_module.Toolbar(tools, self.monitor)
+        self.toolbar = toolbar_module.Toolbar(tools, self.monitor, self.values)
 
     # -- setup -------------------------------------------------------------
 
@@ -98,9 +115,22 @@ class Overlay:
 
     # -- window plumbing ---------------------------------------------------
 
+    @property
+    def surface(self):
+        """The frozen screen as a cairo surface.
+
+        Made on demand rather than at realize time, so that rendering does not
+        depend on the window having been mapped first.
+        """
+        if self._surface is None:
+            self._surface = Gdk.cairo_surface_create_from_pixbuf(self.pixbuf, 1, None)
+        return self._surface
+
     def _on_realize(self, widget):
-        gdk_window = widget.get_window()
-        self.surface = Gdk.cairo_surface_create_from_pixbuf(self.pixbuf, 1, gdk_window)
+        # Remake it against the window, which lets X keep it server-side.
+        self._surface = Gdk.cairo_surface_create_from_pixbuf(
+            self.pixbuf, 1, widget.get_window()
+        )
         self._set_cursor("crosshair")
 
     def _on_map(self, widget, event):
@@ -136,28 +166,55 @@ class Overlay:
         if gdk_window is not None:
             gdk_window.set_cursor(self._cursor(name))
 
-    def _finish(self, rect):
-        self.result = rect
+    def _finish(self, result):
+        self.result = result
         self.window.get_display().get_default_seat().ungrab()
         self.window.destroy()
 
+    def canvas(self):
+        return Canvas(self.surface, self.bounds, self.scale)
+
     # -- intent ------------------------------------------------------------
 
-    def _selection(self):
-        return self.active_tool.selection()
-
-    def _can_capture(self):
-        return self._selection() is not None
+    def capture_region(self):
+        """What Capture would take: the region, or everything."""
+        return self.scene.region or Rect(0, 0, self.bounds.width, self.bounds.height)
 
     def _capture_now(self):
-        rect = self._selection()
-        if rect is not None:
-            self._finish(rect)
+        self._finish(self.render())
+
+    def render(self):
+        """Bake the frozen screen plus every annotation into a pixbuf."""
+        region = self.capture_region()
+        width = max(1, int(round(region.width * self.scale)))
+        height = max(1, int(round(region.height * self.scale)))
+
+        surface = cairo.ImageSurface(cairo.FORMAT_RGB24, width, height)
+        cr = cairo.Context(surface)
+
+        # The frozen screen is already in physical pixels, so place it in
+        # device space; the annotations are in logical pixels, so scale first.
+        cr.save()
+        cr.translate(-region.x * self.scale, -region.y * self.scale)
+        cr.set_source_surface(self.surface, 0, 0)
+        cr.paint()
+        cr.restore()
+
+        cr.scale(self.scale, self.scale)
+        cr.translate(-region.x, -region.y)
+        for item in self.scene.items:
+            item.draw(cr)
+        surface.flush()
+
+        return Gdk.pixbuf_get_from_surface(surface, 0, 0, width, height)
 
     def _choose_tool(self, tool):
-        if tool is not self.active_tool:
-            self.active_tool = tool
-            self.window.queue_draw()
+        if tool is self.active_tool:
+            return
+        self.active_tool.cancel()
+        self.active_tool = tool
+        self.toolbar.show_settings_for(tool)
+        self.window.queue_draw()
 
     def _activate(self, button):
         if button.kind == toolbar_module.TOOL:
@@ -166,6 +223,9 @@ class Overlay:
             self._capture_now()
         elif button.kind == toolbar_module.CANCEL:
             self._finish(None)
+        elif button.kind == toolbar_module.SETTING:
+            self.values.set(button.setting, button.value)
+            self.window.queue_draw()
 
     # -- input -------------------------------------------------------------
 
@@ -182,16 +242,19 @@ class Overlay:
 
         self._pressed_button = None
         self._dragging = True
-        self.active_tool.press(event.x, event.y)
-        widget.queue_draw()
+        self._last_damage = None
+        self.active_tool.begin(
+            (event.x, event.y), self.values.snapshot(self.active_tool.settings)
+        )
+        self._redraw_gesture()
         return True
 
     def _on_motion(self, widget, event):
         self.pointer = (event.x, event.y)
 
         if self._dragging:
-            self.active_tool.drag(event.x, event.y)
-            widget.queue_draw()
+            self.active_tool.extend((event.x, event.y))
+            self._redraw_gesture()
             return True
 
         over_bar = self.toolbar.covers(event.x, event.y)
@@ -213,37 +276,89 @@ class Overlay:
 
         if self._dragging:
             self._dragging = False
-            self.active_tool.release(event.x, event.y)
+            self.scene.do(self.active_tool.finish((event.x, event.y)))
+            self._last_damage = None
             widget.queue_draw()
         return True
 
     def _on_key(self, widget, event):
         key = Gdk.keyval_name(event.keyval)
-        if key in ("Escape", "q"):
-            self._finish(None)
-        elif key in ("Return", "KP_Enter"):
+        control = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
+        shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
+
+        if control and key in ("z", "Z"):
+            changed = self.scene.redo() if shift else self.scene.undo()
+            if changed:
+                self.window.queue_draw()
+            return True
+        if control and key in ("y", "Y"):
+            if self.scene.redo():
+                self.window.queue_draw()
+            return True
+        if key == "Escape":
+            if self._dragging:
+                self._dragging = False
+                self.active_tool.cancel()
+                self.window.queue_draw()
+            else:
+                self._finish(None)
+            return True
+        if key in ("Return", "KP_Enter"):
             self._capture_now()
-        else:
-            return False
-        return True
+            return True
+        return False
 
     # -- drawing -----------------------------------------------------------
 
+    def _redraw_gesture(self):
+        """Repaint only where the gesture is.
+
+        A full repaint of the virtual screen per motion event is far too slow
+        for freehand; the rectangle tool got away with it, the pen does not.
+        """
+        damage = self.active_tool.bounds()
+        if damage is None:
+            self.window.queue_draw()
+            return
+        area = union([damage, self._last_damage] if self._last_damage else [damage])
+        self._last_damage = damage
+        self.window.queue_draw_area(
+            int(area.x - DAMAGE_MARGIN),
+            int(area.y - DAMAGE_MARGIN),
+            int(area.width + DAMAGE_MARGIN * 2),
+            int(area.height + DAMAGE_MARGIN * 2),
+        )
+
     def _on_draw(self, widget, cr):
+        canvas = self.canvas()
+
         cr.set_source_surface(self.surface, 0, 0)
         cr.paint()
         painting.use(cr, theme.SCREEN_DIM)
         cr.paint()
 
-        canvas = Canvas(self.surface, self.bounds, self.scale)
-        self.active_tool.draw(cr, canvas)
+        if self.scene.region is not None:
+            painting.draw_region(cr, canvas, self.scene.region)
 
-        if self._selection() is None:
+        for item in self.scene.items:
+            item.draw(cr)
+
+        self.active_tool.preview(cr, canvas)
+
+        if self._idle():
             self._draw_guides(cr)
             self._draw_hint(cr)
 
-        self.toolbar.draw(cr, self.active_tool, self._can_capture())
+        self.toolbar.draw(cr, self.active_tool)
         return True
+
+    def _idle(self):
+        """Nothing marked out and nothing in progress: show the guides."""
+        return (
+            not self._dragging
+            and self.scene.region is None
+            and not self.scene.items
+        )
 
     def _draw_guides(self, cr):
         if self.pointer is None or self.toolbar.covers(*self.pointer):
