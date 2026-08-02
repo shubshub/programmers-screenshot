@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect x="14" y="14" width="36" height="36" rx="4" fill="#3f9dff" opacity="0.22"/>
+  <g fill="none" stroke="#3f9dff" stroke-width="4" stroke-linecap="round">
+    <!-- crop marks: two overlapping L-brackets framing the capture region -->
+    <path d="M8 20 V12 a4 4 0 0 1 4-4 h8"/>
+    <path d="M44 8 h8 a4 4 0 0 1 4 4 v8"/>
+    <path d="M56 44 v8 a4 4 0 0 1-4 4 h-8"/>
+    <path d="M20 56 h-8 a4 4 0 0 1-4-4 v-8"/>
+  </g>
+  <g fill="none" stroke="#1b6fc4" stroke-width="3.5" stroke-linecap="round">
+    <path d="M26 38 l-5-6 5-6"/>
+    <path d="M38 26 l5 6-5 6"/>
+  </g>
+</svg>

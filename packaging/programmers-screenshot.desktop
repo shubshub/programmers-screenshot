@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Programmers Screenshot
+GenericName=Screenshot Tool
+Comment=Select a screen region, copy it, save it
+Exec=programmers-screenshot
+Icon=programmers-screenshot
+Terminal=false
+Categories=Graphics;
+Keywords=screenshot;capture;snip;region;clipboard;
+StartupNotify=false
+Actions=FullScreen;
+
+[Desktop Action FullScreen]
+Name=Capture Whole Screen
+Exec=programmers-screenshot --full

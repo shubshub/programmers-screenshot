@@ -1,0 +1,29 @@
+Package: programmers-screenshot
+Version: @VERSION@
+Section: graphics
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.8),
+         python3-gi,
+         python3-gi-cairo,
+         python3-cairo,
+         gir1.2-gtk-3.0,
+         gir1.2-gdkpixbuf-2.0,
+         gir1.2-notify-0.7,
+         xclip | wl-clipboard
+Recommends: nautilus | dolphin | nemo | thunar,
+            gnome-session-canberra | pulseaudio-utils | pipewire-bin | alsa-utils
+Maintainer: Chris <chris@kademi.co>
+Homepage: https://github.com/shubshub/programmers-screenshot
+Description: Minimal region screenshot tool for hotkey binding
+ Freezes the screen and puts a toolbar across the top. Pick a tool, mark
+ out what you want, then press Capture. The result is copied to the
+ clipboard and saved as a timestamped PNG in ~/Pictures/Screenshots,
+ with a shutter sound and a notification offering to open the image or
+ show it in its folder.
+ .
+ It does one thing on one keypress: no editor, no dialogs, no upload
+ prompts. Register a GNOME shortcut with --install-hotkey, or point any
+ shortcut at the programmers-screenshot command.
+ .
+ Works on GNOME under X11 and Wayland, and spans multi-monitor layouts.

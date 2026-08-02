@@ -1,0 +1,93 @@
+#!/bin/bash
+# Build programmers-screenshot as an installable .deb.
+#
+#   ./build.sh              -> dist/programmers-screenshot_<version>_all.deb
+#   ./build.sh --install    -> build, then install it with apt
+set -euo pipefail
+
+VERSION="0.4.0"
+PACKAGE="programmers-screenshot"
+ARCH="all"
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILD="$HERE/build/$PACKAGE"
+DIST="$HERE/dist"
+DEB="$DIST/${PACKAGE}_${VERSION}_${ARCH}.deb"
+
+rm -rf "$HERE/build"
+MODULE_DIR="$BUILD/usr/share/$PACKAGE/programmers_screenshot"
+SOUND_DIR="$BUILD/usr/share/$PACKAGE/sounds"
+mkdir -p "$BUILD/DEBIAN" \
+         "$BUILD/usr/bin" \
+         "$MODULE_DIR" \
+         "$SOUND_DIR" \
+         "$BUILD/usr/share/applications" \
+         "$BUILD/usr/share/icons/hicolor/scalable/apps" \
+         "$BUILD/usr/share/man/man1" \
+         "$BUILD/usr/share/doc/$PACKAGE" \
+         "$DIST"
+
+# --- payload ---------------------------------------------------------------
+install -m 0755 "$HERE/bin/$PACKAGE"                       "$BUILD/usr/bin/$PACKAGE"
+install -m 0644 "$HERE"/src/programmers_screenshot/*.py    "$MODULE_DIR/"
+install -m 0644 "$HERE/packaging/shutter.wav"              "$SOUND_DIR/shutter.wav"
+install -m 0644 "$HERE/packaging/$PACKAGE.desktop"         "$BUILD/usr/share/applications/$PACKAGE.desktop"
+install -m 0644 "$HERE/packaging/$PACKAGE.svg"             "$BUILD/usr/share/icons/hicolor/scalable/apps/$PACKAGE.svg"
+gzip -9nc "$HERE/packaging/$PACKAGE.1" > "$BUILD/usr/share/man/man1/$PACKAGE.1.gz"
+chmod 0644 "$BUILD/usr/share/man/man1/$PACKAGE.1.gz"
+
+# --- control ---------------------------------------------------------------
+sed "s/@VERSION@/$VERSION/" "$HERE/packaging/control" > "$BUILD/DEBIAN/control"
+install -m 0755 "$HERE/packaging/postinst" "$BUILD/DEBIAN/postinst"
+install -m 0755 "$HERE/packaging/postrm"   "$BUILD/DEBIAN/postrm"
+
+cat > "$BUILD/usr/share/doc/$PACKAGE/copyright" <<'EOF'
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: programmers-screenshot
+Source: https://github.com/shubshub/programmers-screenshot
+
+Files: *
+Copyright: 2026 Chris <chris@kademi.co>
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the "Software"),
+ to deal in the Software without restriction, including without limitation
+ the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software, and to permit persons to whom the
+ Software is furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ DEALINGS IN THE SOFTWARE.
+EOF
+chmod 0644 "$BUILD/usr/share/doc/$PACKAGE/copyright"
+
+cat > "$BUILD/usr/share/doc/$PACKAGE/changelog.Debian" <<EOF
+$PACKAGE ($VERSION) noble; urgency=medium
+
+  * Initial release: drag-select region capture to clipboard and file.
+
+ -- Chris <chris@kademi.co>  $(date -R)
+EOF
+gzip -9n "$BUILD/usr/share/doc/$PACKAGE/changelog.Debian"
+chmod 0644 "$BUILD/usr/share/doc/$PACKAGE/changelog.Debian.gz"
+
+# --- checksums + build -----------------------------------------------------
+(cd "$BUILD" && find usr -type f -print0 | sort -z | xargs -0 md5sum > DEBIAN/md5sums)
+chmod 0644 "$BUILD/DEBIAN/md5sums"
+
+dpkg-deb --build --root-owner-group "$BUILD" "$DEB" >/dev/null
+echo "Built $DEB"
+
+if [ "${1:-}" = "--install" ]; then
+    sudo apt-get install -y "$DEB"
+    echo
+    echo "Installed. Bind a hotkey with:  programmers-screenshot --install-hotkey"
+fi
