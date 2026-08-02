@@ -89,11 +89,12 @@ def main():
 
     check.section("dragging up into the bar still marks out that strip")
     h = overlay()
+    top = h.overlay.monitor.y  # not necessarily 0: the active monitor may be offset
     x, y = h.canvas_point(dy=300)
     h.press(x, y)
-    h.move(x + 500, monitor.y + 2)
-    h.release(x + 500, monitor.y + 2)
-    check("reaches the top of the screen", h.region.y <= 2, h.region)
+    h.move(x + 500, top + 2)
+    h.release(x + 500, top + 2)
+    check("reaches the top of the monitor", h.region.y <= top + 2, h.region)
 
     check.section("a plain click clears the region")
     h = overlay()

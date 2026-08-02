@@ -1,5 +1,6 @@
-"""Rectangles, in logical screen pixels."""
+"""Rectangles and points, in logical screen pixels."""
 
+import math
 from dataclasses import dataclass
 
 
@@ -64,6 +65,25 @@ class Rect:
 
     def __bool__(self):
         return self.width > 0 and self.height > 0
+
+
+def square_corner(start, end):
+    """Where `end` would be for a square drag, keeping the direction it went."""
+    (x0, y0), (x1, y1) = start, end
+    size = max(abs(x1 - x0), abs(y1 - y0))
+    return (x0 + math.copysign(size, x1 - x0), y0 + math.copysign(size, y1 - y0))
+
+
+def snap_to_45(start, end):
+    """Where `end` would be on the nearest 45 degree ray, same distance out."""
+    (x0, y0), (x1, y1) = start, end
+    dx, dy = x1 - x0, y1 - y0
+    distance = math.hypot(dx, dy)
+    if not distance:
+        return end
+    step = math.pi / 4
+    angle = round(math.atan2(dy, dx) / step) * step
+    return (x0 + distance * math.cos(angle), y0 + distance * math.sin(angle))
 
 
 def union(rects):

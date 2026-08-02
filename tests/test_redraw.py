@@ -181,6 +181,37 @@ def main():
     wrong = screen.differences_from_full_repaint()
     check("matches a full repaint", not wrong, describe(wrong))
 
+    check.section("shapes at the widest thickness leave nothing behind")
+    # These pass whether ShapeTool.drag_extent asks the item for its bounds or
+    # just returns the raw drag box: with the shapes as they are, the overlay's
+    # 8px margin and the union with the previous frame absorb the overhang.
+    # Keep them anyway — they are what will notice when a future shape, a wider
+    # stroke, or a flared arrowhead stops fitting. The guard that bites today
+    # is the bounds check in tests/test_line_tool.py.
+    from programmers_screenshot.tools.line import SHAPE  # noqa: E402
+
+    for shape in ("line", "circle", "arrow"):
+        h = Harness(pixbuf, bounds)
+        screen = Screen(h, bounds)
+        screen.prime()
+        h.use_tool("line")
+        h.overlay.values.set(SHAPE, shape)
+        h.overlay.values.set(COLOUR, (1.0, 0.0, 0.0))
+        h.overlay.values.set(WIDTH, 16)
+        h.press(x, y)
+        screen.flush()
+        for step in range(1, 22):
+            h.move(x + step * 34, y + step * 16)
+            screen.flush()
+        # Shrinking is what exposes it: growing unions each frame with the last,
+        # which happens to cover the overhang, but pulling back leaves the old
+        # stroke's cap and arrowhead outside the new damage.
+        for step in range(21, 4, -1):
+            h.move(x + step * 34, y + step * 16)
+            screen.flush()
+        wrong = screen.differences_from_full_repaint()
+        check("%s matches a full repaint" % shape, not wrong, describe(wrong))
+
     check.section("drawing inside an existing region")
     h = Harness(pixbuf, bounds)
     screen = Screen(h, bounds)

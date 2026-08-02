@@ -4,8 +4,10 @@ A tool turns pointer gestures into a change to the scene. It receives the
 gesture, draws its own in-progress preview, and on release hands back either
 an Action or — the usual case — a bare Item meaning "add this".
 
-Most tools are "drag from A to B and leave a shape behind"; those want
-ShapeTool, which reduces the job to one method.
+Nearly every tool is the same gesture: press, drag, and on release something
+is set. That machinery lives in DragTool, which the region tool and every
+shape tool build on. Reach for Tool directly only for something that is not a
+drag at all.
 """
 
 from .. import painting, theme
@@ -27,10 +29,10 @@ class Tool:
     def begin(self, point, values):
         """Pointer went down. `values` is a snapshot of this tool's settings."""
 
-    def extend(self, point):
+    def extend(self, point, shift=False):
         """Pointer moved with the button held."""
 
-    def finish(self, point):
+    def finish(self, point, shift=False):
         """Pointer came up. Return an Action, an Item, or None for nothing."""
         return None
 
@@ -69,46 +71,101 @@ class Tool:
         painting.draw_text_centred(cr, self.icon_text, box, colour)
 
 
-class ShapeTool(Tool):
-    """Drag from A to B. Implement make_item() and you are done."""
+class DragTool(Tool):
+    """Anything defined by dragging from A to B.
+
+    Owns the gesture — where it started, where it is now, and the settings it
+    began with — so a subclass only says three things: what a finished drag
+    means, what it looks like on the way, and how much of the screen it
+    touches.
+    """
 
     def __init__(self):
         self._start = None
         self._end = None
         self._values = {}
 
-    def make_item(self, start, end, values):
-        """Return the Item for a drag from `start` to `end`, or None."""
+    # -- what subclasses fill in -------------------------------------------
+
+    def complete(self, start, end, values):
+        """The drag ended. Return an Action, an Item, or None."""
         raise NotImplementedError
+
+    def draw_drag(self, cr, canvas, start, end, values):
+        """Optional: paint the drag while it is happening."""
+
+    def drag_extent(self, start, end, values):
+        """Optional: everything draw_drag() touches, for partial redraws.
+
+        The default is the rectangle between the two points, which is too
+        small for anything with a stroke width — a line overhangs its ends by
+        half its width, an arrowhead by several times more. Override it, or
+        the drag will smear.
+        """
+        return Rect.from_points(start, end)
+
+    def constrain(self, start, end, values):
+        """Where the drag ends while Shift is held. Unconstrained by default."""
+        return end
+
+    # -- the machinery, written once ---------------------------------------
+
+    @property
+    def dragging(self):
+        return self._start is not None
 
     def begin(self, point, values):
         self._start = point
         self._end = point
         self._values = values
 
-    def extend(self, point):
-        if self._start is not None:
-            self._end = point
+    def extend(self, point, shift=False):
+        if self.dragging:
+            self._end = self._resolve(point, shift)
 
-    def finish(self, point):
-        if self._start is None:
+    def finish(self, point, shift=False):
+        if not self.dragging:
             return None
-        item = self.make_item(self._start, point, self._values)
+        end = self._resolve(point, shift)
+        result = self.complete(self._start, end, self._values)
         self.cancel()
-        return item
+        return result
 
     def cancel(self):
         self._start = None
         self._end = None
 
     def preview(self, cr, canvas):
-        if self._start is None:
-            return
-        item = self.make_item(self._start, self._end, self._values)
+        if self.dragging:
+            self.draw_drag(cr, canvas, self._start, self._end, self._values)
+
+    def bounds(self):
+        if not self.dragging:
+            return None
+        return self.drag_extent(self._start, self._end, self._values)
+
+    def _resolve(self, point, shift):
+        if shift:
+            return self.constrain(self._start, point, self._values)
+        return point
+
+
+class ShapeTool(DragTool):
+    """A drag that leaves a shape behind. Implement make_item() and you are done."""
+
+    def make_item(self, start, end, values):
+        """Return the Item for a drag from `start` to `end`, or None."""
+        raise NotImplementedError
+
+    def complete(self, start, end, values):
+        return self.make_item(start, end, values)
+
+    def draw_drag(self, cr, canvas, start, end, values):
+        item = self.make_item(start, end, values)
         if item is not None:
             item.draw(cr)
 
-    def bounds(self):
-        if self._start is None:
-            return None
-        return Rect.from_points(self._start, self._end)
+    def drag_extent(self, start, end, values):
+        """Ask the shape how big it really is, stroke width and all."""
+        item = self.make_item(start, end, values)
+        return item.bounds() if item is not None else None

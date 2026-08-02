@@ -46,8 +46,10 @@ class Checker:
         return 1 if self.failures else 0
 
 
-def event(x, y, button=1):
-    return types.SimpleNamespace(x=x, y=y, button=button)
+def event(x, y, button=1, shift=False):
+    """A stand-in for a GdkEvent, carrying the fields the overlay reads."""
+    state = Gdk.ModifierType.SHIFT_MASK if shift else 0
+    return types.SimpleNamespace(x=x, y=y, button=button, state=state)
 
 
 def pixel(pixbuf, x, y):
@@ -106,21 +108,23 @@ class Harness:
     def press(self, x, y, button=1):
         self.overlay._on_press(self.overlay.window, event(x, y, button))
 
-    def move(self, x, y):
-        self.overlay._on_motion(self.overlay.window, event(x, y))
+    def move(self, x, y, shift=False):
+        self.overlay._on_motion(self.overlay.window, event(x, y, shift=shift))
 
-    def release(self, x, y, button=1):
-        self.overlay._on_release(self.overlay.window, event(x, y, button))
+    def release(self, x, y, button=1, shift=False):
+        self.overlay._on_release(
+            self.overlay.window, event(x, y, button, shift=shift)
+        )
 
     def click(self, x, y):
         self.press(x, y)
         self.release(x, y)
 
-    def drag(self, x, y, dx, dy, steps=1):
+    def drag(self, x, y, dx, dy, steps=1, shift=False):
         self.press(x, y)
         for step in range(1, steps + 1):
-            self.move(x + dx * step / steps, y + dy * step / steps)
-        self.release(x + dx, y + dy)
+            self.move(x + dx * step / steps, y + dy * step / steps, shift=shift)
+        self.release(x + dx, y + dy, shift=shift)
 
     def key(self, name, control=False, shift=False):
         state = 0
