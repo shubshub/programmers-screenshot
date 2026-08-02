@@ -71,18 +71,6 @@ def pixel_scale(pixbuf, bounds):
     return pixbuf.get_width() / float(bounds.width)
 
 
-def crop(pixbuf, rect, scale):
-    """Cut a logical-pixel rectangle out of a physical-pixel pixbuf."""
-    whole = Rect(0, 0, pixbuf.get_width(), pixbuf.get_height())
-    region = rect.scaled(scale).rounded().clipped_to(whole)
-    if not region:
-        return None
-    source = GdkPixbuf.Pixbuf.new_subpixbuf(
-        pixbuf, int(region.x), int(region.y), int(region.width), int(region.height)
-    )
-    return source.copy()
-
-
 def _grab_from_root(bounds):
     root = Gdk.get_default_root_window()
     return Gdk.pixbuf_get_from_window(

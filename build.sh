@@ -5,7 +5,7 @@
 #   ./build.sh --install    -> build, then install it with apt
 set -euo pipefail
 
-VERSION="0.4.0"
+VERSION="0.5.0"
 PACKAGE="programmers-screenshot"
 ARCH="all"
 
@@ -16,10 +16,12 @@ DEB="$DIST/${PACKAGE}_${VERSION}_${ARCH}.deb"
 
 rm -rf "$HERE/build"
 MODULE_DIR="$BUILD/usr/share/$PACKAGE/programmers_screenshot"
+TOOLS_DIR="$MODULE_DIR/tools"
 SOUND_DIR="$BUILD/usr/share/$PACKAGE/sounds"
 mkdir -p "$BUILD/DEBIAN" \
          "$BUILD/usr/bin" \
          "$MODULE_DIR" \
+         "$TOOLS_DIR" \
          "$SOUND_DIR" \
          "$BUILD/usr/share/applications" \
          "$BUILD/usr/share/icons/hicolor/scalable/apps" \
@@ -30,6 +32,7 @@ mkdir -p "$BUILD/DEBIAN" \
 # --- payload ---------------------------------------------------------------
 install -m 0755 "$HERE/bin/$PACKAGE"                       "$BUILD/usr/bin/$PACKAGE"
 install -m 0644 "$HERE"/src/programmers_screenshot/*.py    "$MODULE_DIR/"
+install -m 0644 "$HERE"/src/programmers_screenshot/tools/*.py "$TOOLS_DIR/"
 install -m 0644 "$HERE/packaging/shutter.wav"              "$SOUND_DIR/shutter.wav"
 install -m 0644 "$HERE/packaging/$PACKAGE.desktop"         "$BUILD/usr/share/applications/$PACKAGE.desktop"
 install -m 0644 "$HERE/packaging/$PACKAGE.svg"             "$BUILD/usr/share/icons/hicolor/scalable/apps/$PACKAGE.svg"

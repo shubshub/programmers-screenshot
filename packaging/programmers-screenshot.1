@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.4.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.5.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -6,7 +6,7 @@ programmers\-screenshot \- region screenshot tool for hotkey binding
 .RI [ OPTIONS ]
 .SH DESCRIPTION
 Freezes the screen and dims it, then puts a toolbar across the top of the
-monitor you are working on. Pick a tool, mark out what you want, and press
+monitor you are working on. Mark out a region, draw on it, and press
 .B Capture
 in the top right corner. The result is copied to the clipboard and written as
 a timestamped PNG to
@@ -47,13 +47,22 @@ owned by a short-lived detached helper, which exits when the notification is
 dismissed, when a button is pressed, or after five minutes.
 .SH TOOLS
 .TP
-.B Rectangle
-Click and drag to mark out a rectangular region. Dragging again replaces the
-selection; a single click clears it.
+.B Region
+Click and drag to mark out what will be captured. Dragging again replaces it;
+a single click clears it. The region is optional: with none marked out, Capture
+takes the whole screen.
+.TP
+.B Pen
+Draw freehand on the frozen screen, in the colour and thickness chosen on the
+settings row. Annotations are baked into the captured image.
+.PP
+A tool that has settings gets a second toolbar row beneath the first, holding
+its own options. Setting values are shared between tools, so a colour chosen
+for one is the colour the next one uses.
 .SH INTERFACE
 .TP
 .B Capture
-Top right. Enabled once something is selected.
+Top right. Always available.
 .TP
 .B ✕
 Left of Capture. Closes without capturing.
@@ -61,12 +70,16 @@ Left of Capture. Closes without capturing.
 .B Enter
 Same as pressing Capture.
 .TP
+.B Ctrl+Z ", " Ctrl+Shift+Z
+Undo and redo. Setting the region is undoable just as drawing is.
+.TP
 .B Escape ", right click"
-Cancel. Nothing is written and the exit status is 1.
+Cancel. Nothing is written and the exit status is 1. Pressing Escape during a
+drag abandons only that stroke.
 .PP
-The toolbar is not a drawing surface, so a selection cannot be *started*
-underneath it. Dragging upwards from below into the toolbar strip does still
-select it, which is how you capture the top edge of the screen.
+The toolbar is not a drawing surface, so a drag cannot be *started* underneath
+it. Dragging upwards from below into the toolbar strip does still work, which
+is how you capture the top edge of the screen.
 .SH OPTIONS
 .TP
 .BR \-f ", " \-\-full
