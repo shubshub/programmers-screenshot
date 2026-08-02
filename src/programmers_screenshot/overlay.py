@@ -241,15 +241,22 @@ class Overlay:
             return True
 
         self._pressed_button = None
+        was_idle = self._idle()
         self._dragging = True
         self._last_damage = None
         self.active_tool.begin(
             (event.x, event.y), self.values.snapshot(self.active_tool.settings)
         )
-        self._redraw_gesture()
+        if was_idle:
+            # The hint and the guides go away now, and both sit outside any
+            # damage the gesture will report.
+            self.window.queue_draw()
+        else:
+            self._redraw_gesture()
         return True
 
     def _on_motion(self, widget, event):
+        previous = self.pointer
         self.pointer = (event.x, event.y)
 
         if self._dragging:
@@ -261,7 +268,25 @@ class Overlay:
         self._set_cursor("default" if over_bar else "crosshair")
         if self.toolbar.set_hover(event.x, event.y):
             widget.queue_draw()
+        else:
+            self._redraw_guides(previous)
         return True
+
+    def _redraw_guides(self, previous):
+        """Move the crosshair without repainting the whole screen.
+
+        Two thin strips per position: the lines are long but only a few pixels
+        thick, so this stays cheap even across a 5360px screen.
+        """
+        if not self._idle():
+            return
+        width, height = int(self.bounds.width), int(self.bounds.height)
+        for point in (previous, self.pointer):
+            if point is None:
+                continue
+            x, y = int(point[0]), int(point[1])
+            self.window.queue_draw_area(0, y - 2, width, 5)
+            self.window.queue_draw_area(x - 2, 0, 5, height)
 
     def _on_release(self, widget, event):
         if event.button != 1:
@@ -310,13 +335,26 @@ class Overlay:
 
     # -- drawing -----------------------------------------------------------
 
+    def _gesture_damage(self):
+        """Everything the gesture in progress paints, chrome included."""
+        areas = []
+        bounds = self.active_tool.bounds()
+        if bounds is not None:
+            areas.append(bounds)
+        pending = self.active_tool.pending_region()
+        if pending is not None:
+            areas.append(painting.region_damage(pending))
+        return union(areas) if areas else None
+
     def _redraw_gesture(self):
         """Repaint only where the gesture is.
 
         A full repaint of the virtual screen per motion event is far too slow
         for freehand; the rectangle tool got away with it, the pen does not.
+        The previous damage goes in too, so whatever the gesture has just moved
+        off gets painted back.
         """
-        damage = self.active_tool.bounds()
+        damage = self._gesture_damage()
         if damage is None:
             self.window.queue_draw()
             return

@@ -81,10 +81,27 @@ def draw_text_centred(cr, text, rect, colour):
 # --------------------------------------------------------------------------
 
 
+# The size label sits above the region, and on a narrow one it is wider than
+# the region itself. A redraw clipped to the region alone leaves the previous
+# label behind, so partial redraws need to know about this overhang.
+LABEL_BAND = 34        # label height plus the gap above the region
+LABEL_MAX_WIDTH = 130  # "99999 × 99999" plus padding, at FONT_SIZE_LABEL
+
+
 def draw_region(cr, canvas, rect):
     reveal(cr, canvas, rect)
     region_outline(cr, rect)
     size_label(cr, canvas, rect)
+
+
+def region_damage(rect):
+    """Everything draw_region() can touch, for a partial redraw."""
+    return Rect(
+        rect.x - 2,
+        rect.y - LABEL_BAND,
+        max(rect.width, LABEL_MAX_WIDTH) + 4,
+        rect.height + LABEL_BAND + 4,
+    )
 
 
 def reveal(cr, canvas, rect):

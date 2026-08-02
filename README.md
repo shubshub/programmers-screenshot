@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.5.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.5.1_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.5.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.5.1_all.deb
 ```
 
 ## Bind it to a key
@@ -239,6 +239,7 @@ to a core module to pass, the framework has stopped doing its job.
 ```bash
 python3 tests/test_framework.py       # scene, settings, tools, adding a tool
 python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
+python3 tests/test_redraw.py          # partial redraws leave no stale pixels
 python3 tests/test_notifications.py   # notification wiring and agent handoff
 python3 tests/test_sound.py           # the sound asset, generator and playback
 ```
