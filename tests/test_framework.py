@@ -20,7 +20,7 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from support import Checker, Harness, pixel  # noqa: E402
+from support import Checker, Harness, pixel, render_overlay  # noqa: E402
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
@@ -201,6 +201,51 @@ def main():
     h.release(h.overlay.toolbar.settings_rect.x + 400,
               h.overlay.toolbar.settings_rect.y + 200)
     check("no stroke from the settings row", not h.overlay.scene.items)
+
+    # ------------------------------------------------- drawing order on screen
+    check.section("annotations stay visible while a region is dragged over them")
+    # Regression: the region tool undims its rectangle by repainting the frozen
+    # screen. Drawn from preview(), that ran after the annotations and wiped
+    # them until the drag was released.
+    h = overlay()
+    h.use_tool("pen")
+    h.overlay.values.set(COLOUR, (0.0, 1.0, 0.0))
+    h.overlay.values.set(WIDTH, 20)
+    x, y = h.canvas_point()
+    h.drag(x, y, 300, 0, steps=10)
+
+    def is_green(read, at_x, at_y):
+        red, green, blue = read(at_x, at_y)
+        return green > 180 and red < 80 and blue < 80
+
+    check("the stroke is on screen", is_green(render_overlay(h), x + 150, y),
+          render_overlay(h)(x + 150, y))
+
+    h.use_tool("rectangle")
+    h.press(x - 100, y + 100)
+    h.move(x + 400, y - 60)
+    check("gesture really started", h.overlay._dragging)
+    read = render_overlay(h)
+    check("still visible mid-drag", is_green(read, x + 150, y), read(x + 150, y))
+    check("the region under it is undimmed",
+          sum(read(x + 380, y - 40)) > sum(read(x + 900, y)),
+          "%s inside vs %s outside" % (read(x + 380, y - 40), read(x + 900, y)))
+
+    h.release(x + 400, y - 60)
+    read = render_overlay(h)
+    check("and after releasing", is_green(read, x + 150, y), read(x + 150, y))
+
+    check.section("only one region is undimmed at a time")
+    h = overlay()
+    x, y = h.canvas_point()
+    h.drag(x, y, 200, 150)                    # commit a region
+    h.press(x + 900, y)                       # start a second, elsewhere
+    h.move(x + 1300, y + 150)
+    read = render_overlay(h)
+    inside_new = sum(read(x + 1100, y + 70))
+    inside_old = sum(read(x + 100, y + 70))
+    check("the new one is revealed", inside_new > inside_old,
+          "new %d vs old %d" % (inside_new, inside_old))
 
     # ----------------------------------------------------------------- bake
     check.section("annotations are baked into the captured image")

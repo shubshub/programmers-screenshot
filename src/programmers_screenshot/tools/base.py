@@ -40,7 +40,21 @@ class Tool:
     # -- drawing -----------------------------------------------------------
 
     def preview(self, cr, canvas):
-        """Draw the gesture in progress, over the dimmed screen."""
+        """Draw the gesture in progress, over the dimmed screen.
+
+        This runs after the committed annotations, so anything drawn here sits
+        on top of them. A tool that needs to change the backdrop instead —
+        undimming part of the screen, say — should use pending_region().
+        """
+
+    def pending_region(self):
+        """The capture region this tool is dragging out right now, if any.
+
+        The overlay draws it exactly where it draws the committed one: beneath
+        the annotations. Without this a tool that undims the screen would paint
+        over everything already drawn there.
+        """
+        return None
 
     def bounds(self):
         """Where the gesture in progress is, for partial redraws."""

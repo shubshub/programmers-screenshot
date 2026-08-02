@@ -57,6 +57,29 @@ def pixel(pixbuf, x, y):
     return tuple(data[offset:offset + 3])
 
 
+def render_overlay(harness):
+    """Paint the overlay exactly as the draw handler would, and return a
+    reader for its pixels. Used to check what is actually on screen mid-drag,
+    which no amount of state inspection can tell you."""
+    import cairo
+
+    bounds = harness.overlay.bounds
+    surface = cairo.ImageSurface(
+        cairo.FORMAT_ARGB32, int(bounds.width), int(bounds.height)
+    )
+    harness.overlay._on_draw(harness.overlay.window, cairo.Context(surface))
+    surface.flush()
+    data = surface.get_data()
+    stride = surface.get_stride()
+
+    def read(x, y):
+        offset = int(y) * stride + int(x) * 4
+        blue, green, red = data[offset], data[offset + 1], data[offset + 2]
+        return (red, green, blue)
+
+    return read
+
+
 class Harness:
     """An Overlay with its window and exit path stubbed out."""
 
