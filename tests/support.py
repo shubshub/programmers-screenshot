@@ -52,6 +52,26 @@ def event(x, y, button=1, shift=False):
     return types.SimpleNamespace(x=x, y=y, button=button, state=state)
 
 
+def key_event(name, control=False, shift=False):
+    """A stand-in for a GdkEventKey.
+
+    `string` is what the key would type, which is how the text tool tells a
+    printable key from a functional one — real events always carry it.
+    """
+    state = 0
+    if control:
+        state |= Gdk.ModifierType.CONTROL_MASK
+    if shift:
+        state |= Gdk.ModifierType.SHIFT_MASK
+    keyval = Gdk.keyval_from_name(name) if len(name) > 1 else ord(name)
+    codepoint = Gdk.keyval_to_unicode(keyval)
+    return types.SimpleNamespace(
+        keyval=keyval,
+        state=state,
+        string=chr(codepoint) if codepoint else "",
+    )
+
+
 def pixel(pixbuf, x, y):
     """The (r, g, b) of one pixel."""
     data = pixbuf.get_pixels()
@@ -127,15 +147,12 @@ class Harness:
         self.release(x + dx, y + dy, shift=shift)
 
     def key(self, name, control=False, shift=False):
-        state = 0
-        if control:
-            state |= Gdk.ModifierType.CONTROL_MASK
-        if shift:
-            state |= Gdk.ModifierType.SHIFT_MASK
-        self.overlay._on_key(
-            self.overlay.window,
-            types.SimpleNamespace(keyval=Gdk.keyval_from_name(name), state=state),
-        )
+        self.overlay._on_key(self.overlay.window, key_event(name, control, shift))
+
+    def type_text(self, text):
+        """Send each character as its own key press, as a keyboard would."""
+        for character in text:
+            self.key("Return" if character == "\n" else character)
 
     # -- positions ---------------------------------------------------------
 
