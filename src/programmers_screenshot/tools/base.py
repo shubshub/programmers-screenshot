@@ -37,7 +37,29 @@ class Tool:
         return None
 
     def cancel(self):
-        """Abandon the gesture in progress."""
+        """Abandon whatever is in progress, keeping none of it."""
+
+    def commit(self):
+        """Finish anything in progress. Return an Action, an Item, or None.
+
+        Most tools finish on release and have nothing left over, so the default
+        is None. A tool whose state outlives a single gesture — text being
+        typed, say — returns it here. The overlay calls this before capturing,
+        before switching tools and before a fresh gesture starts, so nothing
+        half-finished is silently lost.
+        """
+        return None
+
+    # -- keyboard ----------------------------------------------------------
+
+    def key_press(self, key, text, control, shift):
+        """Handle a key. Return True to stop the overlay acting on it too.
+
+        The active tool gets first refusal, because the overlay's own bindings
+        collide with typing: Enter captures, Escape closes. `key` is a GDK key
+        name such as "Return"; `text` is what the key would type, if anything.
+        """
+        return False
 
     # -- drawing -----------------------------------------------------------
 

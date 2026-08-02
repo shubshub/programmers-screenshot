@@ -18,8 +18,9 @@ from .line import LineTool
 from .pen import PenTool
 from .rectangle import RectangleTool
 from .step import StepTool
+from .text import TextTool
 
-ALL_TOOLS = (RectangleTool, PenTool, LineTool, StepTool)
+ALL_TOOLS = (RectangleTool, PenTool, LineTool, StepTool, TextTool)
 
 __all__ = [
     "ALL_TOOLS",

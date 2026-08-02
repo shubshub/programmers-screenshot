@@ -232,6 +232,34 @@ def main():
     wrong = screen.differences_from_full_repaint()
     check("matches a full repaint", not wrong, describe(wrong))
 
+    check.section("a growing block of text leaves nothing behind")
+    # The box grows as you type and shrinks on backspace, and unlike a drag
+    # there is no release to trigger a full repaint and tidy up.
+    from programmers_screenshot.tools.text import BACKGROUND, SIZE  # noqa: E402
+
+    h = Harness(pixbuf, bounds)
+    screen = Screen(h, bounds)
+    screen.prime()
+    h.use_tool("text")
+    h.overlay.values.set(SIZE, 28)
+    h.overlay.values.set(BACKGROUND, True)
+    h.overlay.values.set(COLOUR, (0.9, 0.1, 0.1))
+    h.click(x, y)
+    screen.flush()
+    for character in "a longer line of text":
+        h.type_text(character)
+        screen.flush()
+    h.key("Return")
+    screen.flush()
+    for character in "and a second":
+        h.type_text(character)
+        screen.flush()
+    for _ in range(8):  # backspacing shrinks it again
+        h.key("BackSpace")
+        screen.flush()
+    wrong = screen.differences_from_full_repaint()
+    check("matches a full repaint", not wrong, describe(wrong))
+
     check.section("drawing inside an existing region")
     h = Harness(pixbuf, bounds)
     screen = Screen(h, bounds)
