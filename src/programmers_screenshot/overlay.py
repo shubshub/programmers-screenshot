@@ -240,6 +240,7 @@ class Overlay:
             self._finish(None)
         elif button.kind == toolbar_module.SETTING:
             self.values.set(button.setting, button.value)
+            self.active_tool.settings_changed(self.values)
             self.window.queue_draw()
 
     # -- input -------------------------------------------------------------

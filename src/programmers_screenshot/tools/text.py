@@ -127,6 +127,12 @@ class TextTool(Tool):
     def finish(self, point, shift=False):
         return None  # typing continues after the button comes up
 
+    def settings_changed(self, values):
+        """Apply size, backing and colour to the text already being typed,
+        rather than only to the next one."""
+        if self.editing:
+            self._values = values.snapshot(self.settings)
+
     def cancel(self):
         self._origin = None
         self._lines = [""]
