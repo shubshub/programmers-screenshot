@@ -277,6 +277,9 @@ class Overlay:
         was_idle = self._idle()
         self._dragging = True
         self._last_damage = None
+        # Some tools need to read the frozen screen when the gesture ends, and
+        # only drawing is handed a canvas. Give them one for the whole gesture.
+        self.active_tool.canvas = self.canvas()
         self.active_tool.begin(
             (event.x, event.y), self.values.snapshot(self.active_tool.settings)
         )

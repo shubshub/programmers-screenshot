@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.12.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.13.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -68,6 +68,15 @@ saved PNG. This matters: pixelating or blurring a secret only averages the
 pixels, and those averages leak \- pixelated text can be recovered by
 rendering candidate strings, pixelating them the same way and matching. Use
 this for tokens, keys and addresses.
+.TP
+.B Pixelate
+Drag out an area and it is broken into coarse blocks, at one of three sizes.
+The blocks are averaged from the frozen screen when the drag ends. This is for
+faces and clutter, not for secrets: the averages leak, and pixelated text can
+be recovered by rendering candidate strings, pixelating them the same way and
+matching. Use
+.B Redact
+for anything that must not get out.
 .TP
 .B Step
 Click to drop a numbered badge, counting 1, 2, 3 and on as you go, for marking
