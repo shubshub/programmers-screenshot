@@ -1,12 +1,12 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.9.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.10.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
 .B programmers\-screenshot
 .RI [ OPTIONS ]
 .SH DESCRIPTION
-Freezes the screen and dims it, then puts a toolbar across the top of the
-monitor you are working on. Mark out a region, draw on it, and press
+Freezes the screen and dims it, then puts a toolbar across the top of every
+monitor. Mark out a region, draw on it, and press
 .B Capture
 in the top right corner. The result is copied to the clipboard and written as
 a timestamped PNG to
@@ -158,8 +158,10 @@ it goes through the
 D\-Bus interface, so a GNOME session is required there.
 .PP
 The overlay spans every monitor, so a selection may cross screen boundaries.
-The toolbar itself is placed on whichever monitor the pointer was on when the
-tool started.
+Every monitor gets its own copy of the toolbar, laid out to that screen's
+width. They are all views of the same state, so a tool or a colour chosen on
+one applies everywhere. The toolbar strip cannot start a drag on any screen,
+though dragging upward into it still works.
 .SH SEE ALSO
 .BR xclip (1),
 .BR wl\-copy (1)

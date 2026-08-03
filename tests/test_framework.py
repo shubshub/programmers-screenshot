@@ -168,24 +168,24 @@ def main():
     # ------------------------------------------------------------- settings bar
     check.section("the settings row appears only for tools that have settings")
     h = overlay()
-    check("no row for the region tool", h.overlay.toolbar.settings_rect is None)
+    check("no row for the region tool", h.bar.settings_rect is None)
     h.use_tool("pen")
-    check("row for the pen", h.overlay.toolbar.settings_rect is not None)
+    check("row for the pen", h.bar.settings_rect is not None)
     check("row sits under the main bar",
-          h.overlay.toolbar.settings_rect.y == h.overlay.toolbar.rect.bottom)
+          h.bar.settings_rect.y == h.bar.rect.bottom)
     check("row is part of the bar for hit testing",
-          h.overlay.toolbar.covers(h.overlay.toolbar.settings_rect.x + 5,
-                                   h.overlay.toolbar.settings_rect.y + 5))
-    swatches = [b for b in h.overlay.toolbar.setting_buttons
+          h.bar.covers(h.bar.settings_rect.x + 5,
+                                   h.bar.settings_rect.y + 5))
+    swatches = [b for b in h.bar.setting_buttons
                 if b.setting.key == "colour"]
-    widths = [b for b in h.overlay.toolbar.setting_buttons
+    widths = [b for b in h.bar.setting_buttons
               if b.setting.key == "width"]
     check("a swatch per palette colour", len(swatches) == len(theme.PALETTE))
     check("a button per width", len(widths) == 4, len(widths))
     check("options do not overlap",
           all(a.rect.right <= b.rect.x
-              for a, b in zip(h.overlay.toolbar.setting_buttons,
-                              h.overlay.toolbar.setting_buttons[1:])))
+              for a, b in zip(h.bar.setting_buttons,
+                              h.bar.setting_buttons[1:])))
 
     target = swatches[3]
     h.click(target.rect.x + 2, target.rect.y + 2)
@@ -194,12 +194,12 @@ def main():
     check("selecting a setting does not capture", not h.finished)
 
     check.section("the settings row cannot be drawn on")
-    h.press(h.overlay.toolbar.settings_rect.x + 300,
-            h.overlay.toolbar.settings_rect.y + 5)
-    h.move(h.overlay.toolbar.settings_rect.x + 400,
-           h.overlay.toolbar.settings_rect.y + 200)
-    h.release(h.overlay.toolbar.settings_rect.x + 400,
-              h.overlay.toolbar.settings_rect.y + 200)
+    h.press(h.bar.settings_rect.x + 300,
+            h.bar.settings_rect.y + 5)
+    h.move(h.bar.settings_rect.x + 400,
+           h.bar.settings_rect.y + 200)
+    h.release(h.bar.settings_rect.x + 400,
+              h.bar.settings_rect.y + 200)
     check("no stroke from the settings row", not h.overlay.scene.items)
 
     # ------------------------------------------------- drawing order on screen
@@ -286,8 +286,8 @@ def main():
     check("it is the active tool", h.overlay.active_tool.name == "blob")
     check("it got a toolbar button",
           h.button(toolbar.TOOL, "blob") is not None)
-    check("its settings built a row", h.overlay.toolbar.settings_rect is not None)
-    keys = {b.setting.key for b in h.overlay.toolbar.setting_buttons}
+    check("its settings built a row", h.bar.settings_rect is not None)
+    keys = {b.setting.key for b in h.bar.setting_buttons}
     check("including its own custom setting", keys == {"colour", "blob-size"}, keys)
 
     h.overlay.values.set(COLOUR, (0.0, 1.0, 0.0))
@@ -306,7 +306,7 @@ def main():
     check("and it lands in the captured image",
           corner[1] > 200 and corner[0] < 60, "rgb%s" % (corner,))
 
-    size_button = next(b for b in h.overlay.toolbar.setting_buttons
+    size_button = next(b for b in h.bar.setting_buttons
                        if b.setting.key == "blob-size" and b.value == "S")
     h.click(size_button.rect.x + 2, size_button.rect.y + 2)
     check("its custom setting is selectable",

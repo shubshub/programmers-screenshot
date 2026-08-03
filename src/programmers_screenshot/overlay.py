@@ -67,10 +67,11 @@ class Overlay:
         self._grab_attempts = 0
 
         self.window = self._build_window()
-        # Chrome lives on one monitor: the one the pointer was on when the
-        # hotkey fired, which is where the user is looking.
-        self.monitor = self._active_monitor()
-        self.toolbar = toolbar_module.Toolbar(tools, self.monitor, self.values)
+        # A bar on every monitor, so the controls are wherever you are looking.
+        # The one the pointer started on comes first and counts as primary.
+        self.monitors = self._overlay_monitors()
+        self.monitor = self.monitors[0]
+        self.toolbars = toolbar_module.Toolbars(tools, self.monitors, self.values)
 
     # -- setup -------------------------------------------------------------
 
@@ -111,12 +112,17 @@ class Overlay:
         window.connect("destroy", lambda *_: Gtk.main_quit())
         return window
 
-    def _active_monitor(self):
-        """The monitor under the pointer, in overlay coordinates."""
+    def _overlay_monitors(self):
+        """Every monitor in overlay coordinates, the pointer's one first."""
         display = Gdk.Display.get_default()
         x, y = capture.pointer_position(display)
-        monitor = capture.monitor_at(display, x, y)
-        return monitor.translated(-self.bounds.x, -self.bounds.y)
+        offset = (-self.bounds.x, -self.bounds.y)
+        active = capture.monitor_at(display, x, y).translated(*offset)
+        monitors = [rect.translated(*offset) for rect in capture.monitor_rects(display)]
+        if not monitors:
+            return [active]
+        monitors.sort(key=lambda rect: rect != active)  # stable: active first
+        return monitors
 
     def run(self):
         self.window.show_all()
@@ -228,7 +234,7 @@ class Overlay:
         self.scene.do(self.active_tool.commit())
         self.active_tool.cancel()
         self.active_tool = tool
-        self.toolbar.show_settings_for(tool)
+        self.toolbars.show_settings_for(tool)
         self.window.queue_draw()
 
     def _activate(self, button):
@@ -250,10 +256,10 @@ class Overlay:
             self._finish(None)
             return True
 
-        if self.toolbar.covers(event.x, event.y):
+        if self.toolbars.covers(event.x, event.y):
             # Remember which button went down so a press-then-drag-away does
             # not fire it; the release decides.
-            self._pressed_button = self.toolbar.button_at(event.x, event.y)
+            self._pressed_button = self.toolbars.button_at(event.x, event.y)
             return True
 
         self._pressed_button = None
@@ -282,9 +288,9 @@ class Overlay:
             self._redraw_gesture()
             return True
 
-        over_bar = self.toolbar.covers(event.x, event.y)
+        over_bar = self.toolbars.covers(event.x, event.y)
         self._set_cursor("default" if over_bar else "crosshair")
-        if self.toolbar.set_hover(event.x, event.y):
+        if self.toolbars.set_hover(event.x, event.y):
             widget.queue_draw()
         else:
             self._redraw_guides(previous)
@@ -416,10 +422,10 @@ class Overlay:
             self._draw_guides(cr)
             self._draw_hint(cr)
 
-        self.toolbar.draw(cr, self.active_tool)
+        self.toolbars.draw(cr, self.active_tool)
         if not self._dragging:
             # Hover is not tracked mid-gesture, so it would be stale.
-            self.toolbar.draw_tooltip(cr)
+            self.toolbars.draw_tooltip(cr)
         return True
 
     def _idle(self):
@@ -432,7 +438,7 @@ class Overlay:
         )
 
     def _draw_guides(self, cr):
-        if self.pointer is None or self.toolbar.covers(*self.pointer):
+        if self.pointer is None or self.toolbars.covers(*self.pointer):
             return
         x, y = self.pointer
         painting.use(cr, theme.GUIDE_LINE)
@@ -444,15 +450,21 @@ class Overlay:
         cr.stroke()
 
     def _draw_hint(self, cr):
-        """A one-line reminder, low and centred on the active monitor."""
+        """A one-line reminder, low and centred on every monitor.
+
+        Repeated rather than left on one screen: with a toolbar everywhere,
+        a screen with controls but no instructions reads as broken. It goes
+        away as soon as anything is marked out.
+        """
         painting.select_font(cr, theme.FONT_UI, theme.FONT_SIZE_HINT)
         width, height = painting.text_size(cr, HINT)
         pad_x, pad_y = 14, 9
-        box = Rect(
-            self.monitor.x + (self.monitor.width - width - pad_x * 2) / 2,
-            self.monitor.y + self.monitor.height * 0.86,
-            width + pad_x * 2,
-            height + pad_y * 2,
-        )
-        painting.fill_rounded(cr, box, theme.HINT_BG)
-        painting.draw_text(cr, HINT, box.x + pad_x, box.y + pad_y, theme.HINT_TEXT)
+        for monitor in self.monitors:
+            box = Rect(
+                monitor.x + (monitor.width - width - pad_x * 2) / 2,
+                monitor.y + monitor.height * 0.86,
+                width + pad_x * 2,
+                height + pad_y * 2,
+            )
+            painting.fill_rounded(cr, box, theme.HINT_BG)
+            painting.draw_text(cr, HINT, box.x + pad_x, box.y + pad_y, theme.HINT_TEXT)
