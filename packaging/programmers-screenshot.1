@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.7.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.8.1" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -66,6 +66,15 @@ Click to drop a numbered badge, counting 1, 2, 3 and on as you go, for marking
 out the steps of a process. Drag before releasing to place one exactly.
 Undoing a badge hands its number back, so the next one takes it again. The
 numeral is drawn light or dark, whichever reads against the badge colour.
+.TP
+.B Text
+Click to place a caret and type. Enter starts a new line, Backspace deletes,
+and clicking away commits the text. Switching tools or capturing commits it
+too, so nothing typed is lost. With
+.B Backing
+turned on the text sits on a filled white box, one box behind the whole
+paragraph, as wide as the longest line and as tall as all of them together.
+The box is always white; only the text takes the chosen colour.
 .PP
 Holding
 .B Shift
@@ -91,7 +100,7 @@ Undo and redo. Setting the region is undoable just as drawing is.
 .TP
 .B Escape ", right click"
 Cancel. Nothing is written and the exit status is 1. Pressing Escape during a
-drag abandons only that stroke.
+drag abandons only that stroke, and while typing it discards only the text.
 .PP
 The toolbar is not a drawing surface, so a drag cannot be *started* underneath
 it. Dragging upwards from below into the toolbar strip does still work, which
