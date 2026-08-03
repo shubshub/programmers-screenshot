@@ -96,6 +96,37 @@ def main():
     h.release(x + 500, top + 2)
     check("reaches the top of the monitor", h.region.y <= top + 2, h.region)
 
+    check.section("starting a new region deletes the old one")
+    # It used to stay on the scene and keep being drawn, so the new drag
+    # looked like it was rubbing the old rectangle out as it swept across.
+    h = overlay()
+    x, y = h.canvas_point()
+    h.drag(x, y, 300, 200)
+    first = h.region
+    check("one region marked out", first is not None)
+    h.press(x + 600, y + 300)
+    check("pressing removes it immediately", h.region is None, h.region)
+    h.move(x + 900, y + 500)
+    h.release(x + 900, y + 500)
+    check("the new one replaces it",
+          h.region is not None and h.region != first, h.region)
+
+    check.section("undo walks back through both")
+    h.key("z", control=True)
+    check("first undo drops the new region", h.region is None, h.region)
+    h.key("z", control=True)
+    check("second undo brings the old one back", h.region == first, h.region)
+
+    check.section("abandoning the new drag leaves the old one deleted")
+    h = overlay()
+    h.drag(x, y, 300, 200)
+    h.press(x + 600, y + 300)
+    h.key("Escape")
+    check("still open", not h.finished)
+    check("the old region stays gone", h.region is None, h.region)
+    h.key("z", control=True)
+    check("undo brings it back", h.region is not None, h.region)
+
     check.section("a plain click clears the region")
     h = overlay()
     x, y = h.canvas_point()

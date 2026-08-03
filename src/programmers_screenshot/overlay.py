@@ -16,6 +16,7 @@ from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 from . import capture, painting, theme, toolbar as toolbar_module
 from .geometry import Rect, union
+from .actions import SetRegion
 from .scene import Scene
 from .settings import SettingValues
 
@@ -265,15 +266,23 @@ class Overlay:
         self._pressed_button = None
         # Clicking away is how a tool with lingering state is told it is done.
         self.scene.do(self.active_tool.commit())
+
+        # Starting a new region drops the old one there and then. Leaving it
+        # on the scene meant it stayed drawn nowhere near the new gesture, and
+        # the new drag appeared to rub it out as it swept across.
+        dropped = self.active_tool.sets_region and self.scene.region is not None
+        if dropped:
+            self.scene.do(SetRegion(None))
+
         was_idle = self._idle()
         self._dragging = True
         self._last_damage = None
         self.active_tool.begin(
             (event.x, event.y), self.values.snapshot(self.active_tool.settings)
         )
-        if was_idle:
-            # The hint and the guides go away now, and both sit outside any
-            # damage the gesture will report.
+        if was_idle or dropped:
+            # The hint, the guides and the old region all sit outside any
+            # damage the gesture will report, so repaint the lot once.
             self.window.queue_draw()
         else:
             self._redraw_gesture()

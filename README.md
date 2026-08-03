@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.10.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.10.1_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.10.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.10.1_all.deb
 ```
 
 ## Bind it to a key
@@ -78,7 +78,7 @@ screen.
 
 | Tool | Does | Settings |
 | --- | --- | --- |
-| Region | Drag to set what gets captured; click to clear it | — |
+| Region | Drag to set what gets captured; a new drag replaces it, a click clears it | — |
 | Pen | Draw freehand on the frozen screen | Colour, thickness |
 | Line | Straight lines, outlined circles and arrows | Shape, colour, thickness |
 | Step | Click to drop numbered badges: 1, 2, 3… | Size, colour |
