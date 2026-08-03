@@ -1,6 +1,7 @@
 """Command line entry point."""
 
 import argparse
+import os
 import sys
 
 import gi
@@ -10,11 +11,11 @@ gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
-from . import capture, hotkey, notifications, output, tools
+from . import capture, hotkey, notifications, output, preferences, tools
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.17.1"
+VERSION = "0.18.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1
@@ -59,8 +60,24 @@ def build_parser():
     parser.add_argument(
         "--notification-agent", metavar="FILE", help=argparse.SUPPRESS
     )
-    parser.add_argument("--version", action="version", version="%(prog)s " + VERSION)
+    parser.add_argument("--version", action="version", version=version_banner())
     return parser
+
+
+def version_banner():
+    """The version, and where this copy was loaded from.
+
+    The number alone cannot tell you which code is running: a fix between
+    releases does not bump it, so one version can cover several builds. That
+    has already cost two rounds of debugging a bug that was fixed in the
+    checkout and stale in /usr/share, both calling themselves 0.18.0. The
+    path says which is which.
+    """
+    # One line: argparse re-wraps the version string, so a newline here comes
+    # back out mangled.
+    return "programmers-screenshot %s (from %s)" % (
+        VERSION, os.path.dirname(os.path.abspath(__file__))
+    )
 
 
 def main(argv=None):
@@ -72,6 +89,11 @@ def main(argv=None):
         return hotkey.uninstall()
     if options.install_hotkey:
         return hotkey.install(options.install_hotkey)
+
+    # Before the check below, so "nothing to do" accounts for a stored
+    # preference to not save rather than only for the flag.
+    apply_preferences(options)
+
     if options.no_save and options.no_clipboard:
         sys.stderr.write("nothing to do: --no-save and --no-clipboard together\n")
         return EXIT_BAD_USAGE
@@ -101,6 +123,22 @@ def main(argv=None):
 
     output.deliver(captured, options)
     return EXIT_OK
+
+
+def apply_preferences(options):
+    """Fill in what the command line did not say. A flag always wins.
+
+    Only ever tightens: the stored preference can switch saving off, never
+    back on over --no-save.
+    """
+    stored = preferences.load()
+    # -o names a file to write, which is a clearer instruction than a stored
+    # default, so it is not overridden by one.
+    if not options.no_save and not options.output and not stored.get("save", True):
+        options.no_save = True
+    if options.directory is None and stored.get("directory"):
+        options.directory = stored["directory"]
+    return options
 
 
 def run_overlay(pixbuf, bounds):

@@ -14,7 +14,7 @@ gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
-from . import capture, painting, theme, toolbar as toolbar_module
+from . import capture, painting, preferences, theme, toolbar as toolbar_module
 from .geometry import Rect, union
 from .actions import SetRegion
 from .scene import Scene
@@ -245,12 +245,39 @@ class Overlay:
             self._capture_now()
         elif button.kind == toolbar_module.CANCEL:
             self._finish(None)
+        elif button.kind == toolbar_module.SETTINGS:
+            self._edit_preferences()
         elif button.kind == toolbar_module.SETTING:
             self.values.set(button.setting, button.value)
             self.active_tool.settings_changed(
                 self.values.snapshot(self.active_tool.settings)
             )
             self.window.queue_draw()
+
+    def _edit_preferences(self):
+        """Open the settings window, getting out of its way first.
+
+        Two things stop a dialog working over this overlay. It holds a grab on
+        the pointer and the keyboard, so a window opened underneath it gets no
+        events. And on X11 the overlay is override-redirect: it bypasses the
+        window manager and sits above everything, so a dialog opened over it
+        maps for a frame and is then buried, leaving the program apparently
+        frozen in the dialog's own event loop with no reachable way out.
+
+        Neither is worth fighting. Drop the grab, hide the overlay for as long
+        as the window is up, and put it back afterwards. The screen underneath
+        is a still image either way, so there is nothing to see meanwhile.
+        Showing the window again re-runs map-event, which retakes the grab.
+        """
+        self.window.get_display().get_default_seat().ungrab()
+        self.window.hide()
+        try:
+            preferences.edit()
+        finally:
+            self.window.show()
+        # The pointer was elsewhere the whole time, so any hover is stale.
+        self.toolbars.set_hover(-1, -1)
+        self.window.queue_draw()
 
     # -- input -------------------------------------------------------------
 
