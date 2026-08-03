@@ -190,7 +190,7 @@ def main():
     # is the bounds check in tests/test_line_tool.py.
     from programmers_screenshot.tools.line import SHAPE  # noqa: E402
 
-    for shape in ("line", "circle", "arrow"):
+    for shape in ("line", "box", "circle", "arrow"):
         h = Harness(pixbuf, bounds)
         screen = Screen(h, bounds)
         screen.prime()
