@@ -79,9 +79,16 @@ def _grab_from_root(bounds):
 
 
 def _grab_from_gnome_shell():
-    """Wayland has no root window; ask the compositor instead."""
+    """Wayland has no root window; ask the compositor instead.
+
+    The Shell reports back the path it actually wrote to, which is not always
+    the one we asked for. Both get removed: what it leaves behind is the raw
+    screen, so a copy surviving in /tmp would outlive any redaction drawn on
+    the capture we keep.
+    """
     handle, path = tempfile.mkstemp(prefix="programmers-screenshot-", suffix=".png")
     os.close(handle)
+    written_to = None  # bound before the try: the error path reaches `finally`
     try:
         proxy = Gio.DBusProxy.new_for_bus_sync(
             Gio.BusType.SESSION,
@@ -104,6 +111,8 @@ def _grab_from_gnome_shell():
         return None
     finally:
         _unlink(path)
+        if written_to and written_to != path:
+            _unlink(written_to)
 
 
 def _unlink(path):
