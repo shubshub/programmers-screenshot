@@ -134,6 +134,53 @@ def main():
     check("the committed one survives", len(texts(h)) == 1, texts(h))
     check("still typing", h.overlay.active_tool.editing)
 
+    check.section("settings apply to the text already being typed")
+    # Regression: begin() snapshots the settings, which is right for a drag but
+    # left an active text box on stale values until you started a new one.
+    h = typing(size=20, background=False, colour=RED)
+    h.click(x, y)
+    h.type_text("live")
+    tool = h.overlay.active_tool
+
+    def setting_button(key, value):
+        return next(b for b in h.overlay.toolbar.setting_buttons
+                    if b.setting.key == key and b.value == value)
+
+    def press_setting(key, value):
+        rect = setting_button(key, value).rect
+        h.click(rect.x + 4, rect.y + 4)
+
+    check("starts without backing", tool._block().background is False)
+    press_setting("text-background", True)
+    check("backing switches on straight away", tool._block().background is True,
+          tool._block().background)
+    check("still the same text", tool._lines == ["live"], tool._lines)
+    check("still editing", tool.editing)
+
+    press_setting("colour", (0.25, 0.62, 1.0))
+    check("colour applies too", tool._block().colour == (0.25, 0.62, 1.0),
+          tool._block().colour)
+    press_setting("text-size", 40)
+    check("size applies too", tool._block().size == 40, tool._block().size)
+
+    h.click(x + 700, y + 300)
+    committed = [i for i in h.items if isinstance(i, TextBlock)][0]
+    check("and the committed item keeps them",
+          committed.background and committed.size == 40, committed.size)
+
+    check.section("a drag still keeps the settings it started with")
+    # The counterpart: gesture tools must not pick up mid-flight changes.
+    h = typing()
+    h.use_tool("pen")
+    h.overlay.values.set(COLOUR, RED)
+    h.press(x, y)
+    h.move(x + 60, y + 40)
+    h.overlay.active_tool.settings_changed(h.overlay.values)
+    h.overlay.values.set(COLOUR, (0.0, 0.0, 1.0))
+    h.release(x + 120, y + 80)
+    stroke = h.items[0]
+    check("stroke kept the colour it began with", stroke.colour == RED, stroke.colour)
+
     check.section("switching tools commits rather than losing it")
     h = typing()
     h.click(x, y)
