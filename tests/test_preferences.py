@@ -41,8 +41,9 @@ class Checker:
         print("\n%s" % title)
 
     def __call__(self, name, condition, detail=""):
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name,
-                           ("  [%s]" % detail) if detail else ""))
+        # (detail,) so a tuple detail is one argument, not an argument list.
+        suffix = "  [%s]" % (detail,) if detail != "" and detail is not None else ""
+        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name, suffix))
         if not condition:
             self.failures.append(name)
 
@@ -99,26 +100,26 @@ def main():
         # ------------------------------------------------------------------
         check.section("a stored folder fills in for a missing --directory")
         preferences.save({"save": True, "directory": "/tmp/stored"})
-        parsed = cli.apply_preferences(options())
+        parsed = cli.with_preferences(options())
         check("it is used", parsed.directory == "/tmp/stored", parsed.directory)
 
         check.section("but --directory beats it")
-        parsed = cli.apply_preferences(options(directory="/tmp/asked-for"))
+        parsed = cli.with_preferences(options(directory="/tmp/asked-for"))
         check("the flag wins", parsed.directory == "/tmp/asked-for", parsed.directory)
 
         check.section("saving switched off in the window")
         preferences.save({"save": False, "directory": "/tmp/stored"})
-        parsed = cli.apply_preferences(options())
+        parsed = cli.with_preferences(options())
         check("no_save is set", parsed.no_save is True)
 
         check.section("-o still writes a file, whatever is stored")
         # Naming an output file is a clearer instruction than a stored default.
-        parsed = cli.apply_preferences(options(output="/tmp/one-off.png"))
+        parsed = cli.with_preferences(options(output="/tmp/one-off.png"))
         check("no_save stays off", parsed.no_save is False, parsed.no_save)
 
         check.section("the preference never re-enables saving over --no-save")
         preferences.save({"save": True, "directory": None})
-        parsed = cli.apply_preferences(options(no_save=True))
+        parsed = cli.with_preferences(options(no_save=True))
         check("no_save survives", parsed.no_save is True)
 
         check.section("the folder chooser follows the toggle")
@@ -182,6 +183,41 @@ def main():
         # Showing the window again fires map-event, which retakes the grab --
         # so nothing here should be trying to grab it a second time by hand.
         check("it does not re-grab by hand", order.count("ungrab") == 1, order)
+
+        check.section("a change made in the window affects the capture in hand")
+        # The bug: preferences were read once at startup, so switching saving
+        # off in the settings window did nothing until the *next* screenshot --
+        # the one you were holding still got written to disk.
+        preferences.save({"save": True, "directory": None})
+        before = cli.with_preferences(options())
+        preferences.save({"save": False, "directory": None})
+        after = cli.with_preferences(options())
+        check("reading again picks the change up",
+              before.no_save is False and after.no_save is True,
+              (before.no_save, after.no_save))
+
+        # ...and that it is read late is a property of main(), not just of the
+        # helper. Stand in for the settings window by writing the file from
+        # inside run_overlay, which is exactly when the real one writes it.
+        delivered = {}
+        real_run, real_deliver = cli.run_overlay, cli.output.deliver
+
+        def overlay_that_changes_the_setting(pixbuf, bounds):
+            preferences.save({"save": False, "directory": None})
+            return pixbuf
+
+        cli.run_overlay = overlay_that_changes_the_setting
+        cli.output.deliver = lambda pixbuf, opts: delivered.update(
+            no_save=opts.no_save, directory=opts.directory)
+        preferences.save({"save": True, "directory": None})
+        try:
+            code = cli.main([])
+        finally:
+            cli.run_overlay, cli.output.deliver = real_run, real_deliver
+
+        check("the capture completes", code == cli.EXIT_OK, code)
+        check("and it honours the setting just made",
+              delivered.get("no_save") is True, delivered)
 
         check.section("switched off plus --no-clipboard is caught as usage")
         # Both outputs disabled means the capture would go nowhere. The guard
