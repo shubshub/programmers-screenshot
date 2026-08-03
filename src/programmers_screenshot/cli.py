@@ -1,6 +1,7 @@
 """Command line entry point."""
 
 import argparse
+import os
 import sys
 
 import gi
@@ -59,8 +60,24 @@ def build_parser():
     parser.add_argument(
         "--notification-agent", metavar="FILE", help=argparse.SUPPRESS
     )
-    parser.add_argument("--version", action="version", version="%(prog)s " + VERSION)
+    parser.add_argument("--version", action="version", version=version_banner())
     return parser
+
+
+def version_banner():
+    """The version, and where this copy was loaded from.
+
+    The number alone cannot tell you which code is running: a fix between
+    releases does not bump it, so one version can cover several builds. That
+    has already cost two rounds of debugging a bug that was fixed in the
+    checkout and stale in /usr/share, both calling themselves 0.18.0. The
+    path says which is which.
+    """
+    # One line: argparse re-wraps the version string, so a newline here comes
+    # back out mangled.
+    return "programmers-screenshot %s (from %s)" % (
+        VERSION, os.path.dirname(os.path.abspath(__file__))
+    )
 
 
 def main(argv=None):

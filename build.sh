@@ -92,7 +92,11 @@ dpkg-deb --build --root-owner-group "$BUILD" "$DEB" >/dev/null
 echo "Built $DEB"
 
 if [ "${1:-}" = "--install" ]; then
-    sudo apt-get install -y "$DEB"
+    # --reinstall, or apt sees the same version number already installed and
+    # does nothing at all, leaving you testing the previous build. The version
+    # does not change between rebuilds during development, so this is the
+    # normal case rather than the exception.
+    sudo apt-get install -y --reinstall "$DEB"
     echo
     echo "Installed. Bind a hotkey with:  programmers-screenshot --install-hotkey"
 fi
