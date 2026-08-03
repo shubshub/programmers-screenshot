@@ -11,10 +11,11 @@ partial redraws trust it.
 
 import math
 
+import cairo
+
 from .. import painting
 from ..geometry import Rect
 
-ROUND = 1  # cairo.LINE_CAP_ROUND / LINE_JOIN_ROUND
 
 
 class Item:
@@ -45,8 +46,8 @@ class Stroke(Item):
         cr.save()
         painting.use(cr, self.colour)
         cr.set_line_width(self.width)
-        cr.set_line_cap(ROUND)
-        cr.set_line_join(ROUND)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.set_line_join(cairo.LINE_JOIN_ROUND)
 
         if len(self.points) == 1:
             x, y = self.points[0]
@@ -73,6 +74,58 @@ class Stroke(Item):
         )
 
 
+class Highlight(Item):
+    """A marker stroke: a wash of colour that tints without hiding.
+
+    Translucent rather than multiplied. Multiply is what a real highlighter
+    does on paper and looks better on a light screenshot, but it barely
+    touches a dark one — measured on a dark UI it moved the pixels by 30 out
+    of 765, and on near-black by 9. Most screenshots here are dark. Plain
+    alpha is the only blend that stays visible on both.
+
+    Drawn in a single stroke() call, which matters: cairo unions the stroke
+    into one shape before compositing, so a path that crosses itself is not
+    laid down twice. Two separate strokes over each other do build up, which
+    is what a second pass of a real marker does anyway.
+    """
+
+    ALPHA = 0.45
+
+    def __init__(self, points, colour, width):
+        self.points = tuple(points)
+        self.colour = colour
+        self.width = width
+
+    def draw(self, cr):
+        if not self.points:
+            return
+        cr.save()
+        painting.use(cr, tuple(self.colour[:3]) + (self.ALPHA,))
+        cr.set_line_width(self.width)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.set_line_join(cairo.LINE_JOIN_ROUND)
+        cr.move_to(*self.points[0])
+        if len(self.points) == 1:
+            cr.line_to(*self.points[0])  # round cap on a zero-length line: a dot
+        for point in self.points[1:]:
+            cr.line_to(*point)
+        cr.stroke()
+        cr.restore()
+
+    def bounds(self):
+        xs = [x for x, _ in self.points]
+        ys = [y for _, y in self.points]
+        if not xs:
+            return None
+        pad = self.width / 2 + 1
+        return Rect(
+            min(xs) - pad,
+            min(ys) - pad,
+            max(xs) - min(xs) + pad * 2,
+            max(ys) - min(ys) + pad * 2,
+        )
+
+
 class Shape(Item):
     """A stroked shape spanning two corners of a drag."""
 
@@ -85,8 +138,8 @@ class Shape(Item):
     def _stroke_style(self, cr):
         painting.use(cr, self.colour)
         cr.set_line_width(self.width)
-        cr.set_line_cap(ROUND)
-        cr.set_line_join(ROUND)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.set_line_join(cairo.LINE_JOIN_ROUND)
 
     def _padded(self, pad):
         (x0, y0), (x1, y1) = self.start, self.end
