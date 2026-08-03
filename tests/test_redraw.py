@@ -212,6 +212,22 @@ def main():
         wrong = screen.differences_from_full_repaint()
         check("%s matches a full repaint" % shape, not wrong, describe(wrong))
 
+    check.section("dragging out a pixelated area leaves nothing behind")
+    h = Harness(pixbuf, bounds)
+    screen = Screen(h, bounds)
+    screen.prime()
+    h.use_tool("pixelate")
+    h.press(x, y)
+    screen.flush()
+    for step in range(1, 14):
+        h.move(x + step * 34, y + step * 16)
+        screen.flush()
+    for step in range(13, 5, -1):
+        h.move(x + step * 34, y + step * 16)
+        screen.flush()
+    wrong = screen.differences_from_full_repaint()
+    check("matches a full repaint", not wrong, describe(wrong))
+
     check.section("dragging out a redaction bar leaves nothing behind")
     h = Harness(pixbuf, bounds)
     screen = Screen(h, bounds)
