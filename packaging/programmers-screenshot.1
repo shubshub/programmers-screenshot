@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.14.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.15.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -67,6 +67,14 @@ dark one, and most screenshots are dark.
 Drag out a straight line, a rectangle, an outlined circle, or an arrow,
 whichever is chosen on the settings row. The rectangle and the circle are
 outlines, so neither hides what it is drawn around.
+.TP
+.B Measure
+Drag between two points to read the distance. The reading is in physical
+pixels, which on a HiDPI screen is not the same as the logical ones the drag
+covers. A drag along an axis reads as a single number; anything else shows
+width, height and the diagonal. Holding Shift snaps to 45 degrees, which is
+how you get an exactly horizontal or vertical reading. The measurement is
+committed like any other annotation, so it ends up in the capture.
 .TP
 .B Redact
 Drag out a bar that covers something completely, in black or white. The fill
