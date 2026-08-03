@@ -1,3 +1,13 @@
+programmers-screenshot (0.18.1) noble; urgency=medium
+
+  * Fix: a setting changed in the settings window did not affect the capture
+    you were holding, only the next one. Preferences were read once at
+    startup, before the overlay opened, so switching saving off still wrote
+    the screenshot to disk that first time. They are now read after the
+    overlay closes, which is when the window has finished writing them.
+
+ -- Shubshub  Mon, 03 Aug 2026 19:30:00 +1200
+
 programmers-screenshot (0.18.0) noble; urgency=medium
 
   * A settings button on the toolbar, opening a window for preferences that

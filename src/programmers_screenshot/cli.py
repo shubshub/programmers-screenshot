@@ -1,6 +1,7 @@
 """Command line entry point."""
 
 import argparse
+import copy
 import os
 import sys
 
@@ -15,7 +16,7 @@ from . import capture, hotkey, notifications, output, preferences, tools
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.18.0"
+VERSION = "0.18.1"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1
@@ -90,11 +91,9 @@ def main(argv=None):
     if options.install_hotkey:
         return hotkey.install(options.install_hotkey)
 
-    # Before the check below, so "nothing to do" accounts for a stored
-    # preference to not save rather than only for the flag.
-    apply_preferences(options)
-
-    if options.no_save and options.no_clipboard:
+    # An early warning only; the values that count are read again after the
+    # overlay, since the settings window can change them while it is open.
+    if with_preferences(options).no_save and options.no_clipboard:
         sys.stderr.write("nothing to do: --no-save and --no-clipboard together\n")
         return EXIT_BAD_USAGE
     if not options.full and not cairo_is_usable():
@@ -114,31 +113,40 @@ def main(argv=None):
         return EXIT_CANCELLED
 
     if options.full:
-        output.deliver(pixbuf, options)
+        output.deliver(pixbuf, with_preferences(options))
         return EXIT_OK
 
     captured = run_overlay(pixbuf, bounds)
     if captured is None:
         return EXIT_CANCELLED
 
-    output.deliver(captured, options)
+    # After the overlay, not before: the settings window writes the file while
+    # the overlay is up, and the capture in hand has to honour what it says.
+    # Reading at startup meant a change only took effect from the next run.
+    output.deliver(captured, with_preferences(options))
     return EXIT_OK
 
 
-def apply_preferences(options):
-    """Fill in what the command line did not say. A flag always wins.
+def with_preferences(options):
+    """A copy of `options` with stored preferences filling what it omitted.
 
-    Only ever tightens: the stored preference can switch saving off, never
-    back on over --no-save.
+    A copy, not a mutation, so this can be called more than once and still
+    read the command line rather than its own previous answer. Mutating meant
+    an early call that switched saving off could never be switched back on by
+    a later one.
+
+    A flag always wins. Only ever tightens: a stored preference can switch
+    saving off, never back on over --no-save.
     """
     stored = preferences.load()
+    effective = copy.copy(options)
     # -o names a file to write, which is a clearer instruction than a stored
     # default, so it is not overridden by one.
-    if not options.no_save and not options.output and not stored.get("save", True):
-        options.no_save = True
-    if options.directory is None and stored.get("directory"):
-        options.directory = stored["directory"]
-    return options
+    if not effective.no_save and not effective.output and not stored.get("save", True):
+        effective.no_save = True
+    if effective.directory is None and stored.get("directory"):
+        effective.directory = stored["directory"]
+    return effective
 
 
 def run_overlay(pixbuf, bounds):
