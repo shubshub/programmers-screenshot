@@ -29,6 +29,7 @@ from .highlight import HighlighterTool
 from .line import LineTool
 from .measure import MeasureTool
 from .pen import PenTool
+from .picker import PickerTool
 from .pixelate import PixelateTool
 from .rectangle import RectangleTool
 from .redact import RedactTool
@@ -43,6 +44,7 @@ ALL_TOOLS = (
     MeasureTool,
     RedactTool,
     PixelateTool,
+    PickerTool,
     StepTool,
     TextTool,
 )
