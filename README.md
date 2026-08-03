@@ -321,3 +321,10 @@ python3 tests/test_sound.py           # the sound asset, generator and playback
 They run against a real display but never show a window, and never make a
 noise. `tests/support.py` holds the shared harness. The two notification
 actions talk to the desktop, so they are left to manual testing.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Shubshub.
+
+Use it, change it, ship it. The one condition is credit: keep the copyright
+notice and the licence text with any copy or substantial portion of it.

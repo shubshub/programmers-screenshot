@@ -50,7 +50,7 @@ Upstream-Name: programmers-screenshot
 Source: https://github.com/shubshub/programmers-screenshot
 
 Files: *
-Copyright: 2026 Chris <chris@kademi.co>
+Copyright: 2026 Shubshub
 License: MIT
  Permission is hereby granted, free of charge, to any person obtaining a
  copy of this software and associated documentation files (the "Software"),
@@ -72,13 +72,15 @@ License: MIT
 EOF
 chmod 0644 "$BUILD/usr/share/doc/$PACKAGE/copyright"
 
-cat > "$BUILD/usr/share/doc/$PACKAGE/changelog.Debian" <<EOF
-$PACKAGE ($VERSION) noble; urgency=medium
-
-  * Initial release: drag-select region capture to clipboard and file.
-
- -- Chris <chris@kademi.co>  $(date -R)
-EOF
+# The changelog is written by hand in packaging/changelog. It used to be
+# generated here, which meant every build shipped the same "initial release"
+# line no matter what was actually in it.
+head -1 "$HERE/packaging/changelog" | grep -q "($VERSION)" || {
+    echo "packaging/changelog does not start with an entry for $VERSION:" >&2
+    head -1 "$HERE/packaging/changelog" >&2
+    exit 1
+}
+cp "$HERE/packaging/changelog" "$BUILD/usr/share/doc/$PACKAGE/changelog.Debian"
 gzip -9n "$BUILD/usr/share/doc/$PACKAGE/changelog.Debian"
 chmod 0644 "$BUILD/usr/share/doc/$PACKAGE/changelog.Debian.gz"
 

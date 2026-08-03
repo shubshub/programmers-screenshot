@@ -13,7 +13,7 @@ Depends: python3 (>= 3.8),
          xclip | wl-clipboard
 Recommends: nautilus | dolphin | nemo | thunar,
             gnome-session-canberra | pulseaudio-utils | pipewire-bin | alsa-utils
-Maintainer: Chris <chris@kademi.co>
+Maintainer: Shubshub
 Homepage: https://github.com/shubshub/programmers-screenshot
 Description: Minimal region screenshot tool for hotkey binding
  Freezes the screen and puts a toolbar across the top. Mark out a region,
