@@ -21,6 +21,7 @@ SHAPES = {LINE: Line, CIRCLE: Ellipse, ARROW: Arrow}
 class ShapeSetting(ChoiceSetting):
     """Draws each option as the shape it makes, rather than as a caption."""
 
+    draws_caption = False
     PREVIEW_WIDTH = 1.8
 
     def draw_option(self, cr, box, value, active):

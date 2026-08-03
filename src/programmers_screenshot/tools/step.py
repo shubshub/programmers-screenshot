@@ -26,6 +26,8 @@ def contrasting(colour):
 class SizeSetting(ChoiceSetting):
     """Draws each option as a disc of the size it makes."""
 
+    draws_caption = False
+
     def draw_option(self, cr, box, value, active):
         if active:
             painting.fill_rounded(cr, box, theme.ACCENT_SOFT, 4)
@@ -42,7 +44,9 @@ class SizeSetting(ChoiceSetting):
 
 # Its own key rather than `width`: setting values are shared by key, and a 2px
 # pen width would leave a badge you could not read.
-SIZE = SizeSetting("step-size", "Size", 15, ((11, "S"), (15, "M"), (21, "L")))
+SIZE = SizeSetting(
+    "step-size", "Size", 15, ((11, "Small"), (15, "Medium"), (21, "Large"))
+)
 
 
 class Step(Item):

@@ -25,6 +25,9 @@ LABEL_TEXT = (1, 1, 1)
 HINT_BG = (0, 0, 0, 0.72)
 HINT_TEXT = (1, 1, 1, 0.92)
 
+TOOLTIP_BG = (0, 0, 0, 0.88)
+TOOLTIP_TEXT = (1, 1, 1, 0.95)
+
 SETTINGS_BG = (0.13, 0.14, 0.17)
 SETTINGS_LABEL = (1, 1, 1, 0.55)
 SETTINGS_MARK = (0.92, 0.93, 0.95)
@@ -40,6 +43,8 @@ PALETTE = (
     (1.00, 1.00, 1.00),
     (0.08, 0.08, 0.09),
 )
+# Swatches are unlabelled on the bar, so these are what a tooltip says.
+PALETTE_NAMES = ("Red", "Amber", "Green", "Blue", "White", "Black")
 
 # Layout, in logical pixels.
 BAR_HEIGHT = 46
@@ -57,9 +62,13 @@ SETTINGS_OPTION_GAP = 5
 SETTINGS_GROUP_GAP = 26
 SWATCH_RADIUS = 9
 
+TOOLTIP_PADDING = 7
+TOOLTIP_GAP = 6
+
 FONT_UI = "sans-serif"
 FONT_MONO = "monospace"
 FONT_SIZE_UI = 13
 FONT_SIZE_LABEL = 13
 FONT_SIZE_HINT = 14
 FONT_SIZE_SETTING = 12
+FONT_SIZE_TOOLTIP = 12
