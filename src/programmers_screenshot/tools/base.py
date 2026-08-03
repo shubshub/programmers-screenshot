@@ -28,6 +28,11 @@ class Tool:
     #: drops whatever region is already there.
     sets_region = False
 
+    #: The overlay hands the active tool a Canvas when a gesture starts, so a
+    #: tool can read the frozen screen — pixelating has to sample it. Drawing
+    #: gets one passed in and should use that; this is for the rest.
+    canvas = None
+
     # -- gesture -----------------------------------------------------------
 
     def begin(self, point, values):
