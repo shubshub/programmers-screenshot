@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""Stored preferences, and who wins when they disagree with a flag.
+
+Clicking Close needs a person, so that part is not exercised. Everything
+either side of it is: what gets written, what comes back, how it combines
+with the command line, and that the folder chooser follows the toggle.
+
+    python3 tests/test_preferences.py
+"""
+
+import json
+import os
+import shutil
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(HERE, os.pardir)
+sys.path.insert(0, os.path.join(ROOT, "src"))
+
+import gi  # noqa: E402
+
+gi.require_version("Gtk", "3.0")
+
+from gi.repository import Gtk  # noqa: E402
+
+from programmers_screenshot import cli, preferences  # noqa: E402
+
+
+class Checker:
+    def __init__(self):
+        self.failures = []
+
+    def section(self, title):
+        print("\n%s" % title)
+
+    def __call__(self, name, condition, detail=""):
+        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name,
+                           ("  [%s]" % detail) if detail else ""))
+        if not condition:
+            self.failures.append(name)
+
+    def report(self):
+        print("\n%d failure(s)" % len(self.failures))
+        return 1 if self.failures else 0
+
+
+def options(**overrides):
+    """The subset of the parsed command line that preferences touch."""
+    parsed = cli.build_parser().parse_args([])
+    for key, value in overrides.items():
+        setattr(parsed, key, value)
+    return parsed
+
+
+def main():
+    check = Checker()
+    home = tempfile.mkdtemp(prefix="programmers-screenshot-prefs-")
+    config = os.path.join(home, "preferences.json")
+    real_path = preferences.path
+    preferences.path = lambda: config
+
+    try:
+        check.section("with nothing stored, the defaults stand")
+        check("no file yet", not os.path.exists(config))
+        check("saving is on", preferences.load()["save"] is True)
+        check("no folder chosen", preferences.load()["directory"] is None)
+
+        check.section("what is written comes back")
+        preferences.save({"save": False, "directory": "/tmp/shots"})
+        loaded = preferences.load()
+        check("the toggle round-trips", loaded["save"] is False, loaded)
+        check("the folder round-trips", loaded["directory"] == "/tmp/shots", loaded)
+        check("and it is on disk as json",
+              json.load(open(config))["directory"] == "/tmp/shots")
+
+        check.section("a damaged file does not take the program down")
+        with open(config, "w", encoding="utf-8") as handle:
+            handle.write("{not json at all")
+        check("it falls back to the defaults",
+              preferences.load() == preferences.DEFAULTS, preferences.load())
+        with open(config, "w", encoding="utf-8") as handle:
+            json.dump(["a", "list"], handle)
+        check("as it does for the wrong shape",
+              preferences.load() == preferences.DEFAULTS, preferences.load())
+
+        check.section("unknown keys are dropped, known ones survive")
+        preferences.save({"save": True, "directory": "/tmp/a", "wat": 1})
+        loaded = preferences.load()
+        check("the stray key is gone", "wat" not in loaded, loaded)
+        check("the real ones are not", loaded["directory"] == "/tmp/a", loaded)
+
+        # ------------------------------------------------------------------
+        check.section("a stored folder fills in for a missing --directory")
+        preferences.save({"save": True, "directory": "/tmp/stored"})
+        parsed = cli.apply_preferences(options())
+        check("it is used", parsed.directory == "/tmp/stored", parsed.directory)
+
+        check.section("but --directory beats it")
+        parsed = cli.apply_preferences(options(directory="/tmp/asked-for"))
+        check("the flag wins", parsed.directory == "/tmp/asked-for", parsed.directory)
+
+        check.section("saving switched off in the window")
+        preferences.save({"save": False, "directory": "/tmp/stored"})
+        parsed = cli.apply_preferences(options())
+        check("no_save is set", parsed.no_save is True)
+
+        check.section("-o still writes a file, whatever is stored")
+        # Naming an output file is a clearer instruction than a stored default.
+        parsed = cli.apply_preferences(options(output="/tmp/one-off.png"))
+        check("no_save stays off", parsed.no_save is False, parsed.no_save)
+
+        check.section("the preference never re-enables saving over --no-save")
+        preferences.save({"save": True, "directory": None})
+        parsed = cli.apply_preferences(options(no_save=True))
+        check("no_save survives", parsed.no_save is True)
+
+        check.section("the folder chooser follows the toggle")
+        if Gtk.init_check()[0]:
+            dialog, toggle, chooser = preferences.build(
+                {"save": True, "directory": home})
+            check("enabled while saving is on", chooser.get_sensitive())
+            toggle.set_active(False)
+            check("greyed out when switched off", not chooser.get_sensitive())
+            toggle.set_active(True)
+            check("and back again", chooser.get_sensitive())
+            check("it starts on the stored folder",
+                  chooser.get_filename() == home, chooser.get_filename())
+            dialog.destroy()
+        else:
+            check("no display, so the window was not built", False,
+                  "cannot verify the dialog here")
+
+        check.section("switched off plus --no-clipboard is caught as usage")
+        # Both outputs disabled means the capture would go nowhere. The guard
+        # in main() has to see the stored value, not just the flag.
+        preferences.save({"save": False, "directory": None})
+        code = cli.main(["--no-clipboard"])
+        check("it exits with the usage code", code == cli.EXIT_BAD_USAGE, code)
+    finally:
+        preferences.path = real_path
+        shutil.rmtree(home, ignore_errors=True)
+
+    return check.report()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

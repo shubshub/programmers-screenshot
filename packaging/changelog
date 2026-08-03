@@ -1,3 +1,14 @@
+programmers-screenshot (0.18.0) noble; urgency=medium
+
+  * A settings button on the toolbar, opening a window for preferences that
+    outlive a session. The first is whether captures are saved to a folder,
+    and which folder. Stored in
+    ~/.config/programmers-screenshot/preferences.json.
+  * What the window stores is a default. An explicit --directory, --no-save
+    or -o on the command line still wins.
+
+ -- Shubshub  Mon, 03 Aug 2026 18:05:00 +1200
+
 programmers-screenshot (0.17.1) noble; urgency=medium
 
   * Saved screenshots are now mode 0600 rather than whatever the umask

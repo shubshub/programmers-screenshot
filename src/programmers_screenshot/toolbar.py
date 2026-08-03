@@ -14,7 +14,8 @@ from .geometry import Rect
 TOOL = "tool"
 CAPTURE = "capture"
 CANCEL = "cancel"
-SETTING = "setting"
+SETTINGS = "settings"   # the preferences window
+SETTING = "setting"    # one knob on the second row
 
 
 class Toolbars:
@@ -106,10 +107,15 @@ class Toolbar:
             Button(CAPTURE, Rect(capture_x, capture_y, theme.CAPTURE_WIDTH,
                                  theme.CAPTURE_HEIGHT))
         )
-        cancel_width = theme.CAPTURE_HEIGHT
+        # Right to left: Capture, Cancel, Settings.
+        square = theme.CAPTURE_HEIGHT
+        cancel_x = capture_x - theme.TOOL_GAP - square
         buttons.append(
-            Button(CANCEL, Rect(capture_x - theme.TOOL_GAP - cancel_width, capture_y,
-                                cancel_width, theme.CAPTURE_HEIGHT))
+            Button(CANCEL, Rect(cancel_x, capture_y, square, theme.CAPTURE_HEIGHT))
+        )
+        buttons.append(
+            Button(SETTINGS, Rect(cancel_x - theme.TOOL_GAP - square, capture_y,
+                                  square, theme.CAPTURE_HEIGHT))
         )
         return buttons
 
@@ -183,6 +189,8 @@ class Toolbar:
             return button.tool.label or None
         if button.kind == CANCEL:
             return "Close without capturing"
+        if button.kind == SETTINGS:
+            return "Settings"
         if button.kind == SETTING and not button.setting.draws_caption:
             return button.setting.caption(button.value)
         return None  # Capture is already a word
@@ -236,6 +244,8 @@ class Toolbar:
                 self._draw_tool(cr, button, button.tool is active_tool)
             elif button.kind == CAPTURE:
                 self._draw_capture(cr, button)
+            elif button.kind == SETTINGS:
+                self._draw_settings_button(cr, button)
             else:
                 self._draw_cancel(cr, button)
 
@@ -283,6 +293,23 @@ class Toolbar:
         cr.move_to(cx + arm, cy - arm)
         cr.line_to(cx - arm, cy + arm)
         cr.stroke()
+
+    def _draw_settings_button(self, cr, button):
+        """Three sliders. A cog is the convention but needs a lot of cairo to
+        read as one at 32px; sliders survive the size."""
+        if button is self.hovered:
+            painting.fill_rounded(cr, button.rect, theme.BUTTON_HOVER)
+        rect = button.rect
+        left, right = rect.x + 9, rect.right - 9
+        painting.use(cr, theme.BUTTON_ICON)
+        cr.set_line_width(1.4)
+        for offset, along in ((-5, 0.62), (0, 0.34), (5, 0.54)):
+            y = rect.y + rect.height / 2 + offset
+            cr.move_to(left, y)
+            cr.line_to(right, y)
+            cr.stroke()
+            painting.circle(cr, left + (right - left) * along, y, 2.2,
+                            theme.BUTTON_ICON)
 
     def _draw_settings(self, cr):
         rect = self.settings_rect

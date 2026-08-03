@@ -14,7 +14,7 @@ gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
-from . import capture, painting, theme, toolbar as toolbar_module
+from . import capture, painting, preferences, theme, toolbar as toolbar_module
 from .geometry import Rect, union
 from .actions import SetRegion
 from .scene import Scene
@@ -245,12 +245,33 @@ class Overlay:
             self._capture_now()
         elif button.kind == toolbar_module.CANCEL:
             self._finish(None)
+        elif button.kind == toolbar_module.SETTINGS:
+            self._edit_preferences()
         elif button.kind == toolbar_module.SETTING:
             self.values.set(button.setting, button.value)
             self.active_tool.settings_changed(
                 self.values.snapshot(self.active_tool.settings)
             )
             self.window.queue_draw()
+
+    def _edit_preferences(self):
+        """Open the settings window, having first let go of the input grab.
+
+        The overlay owns the pointer and the keyboard. A dialog opened
+        underneath that grab receives no events at all and simply looks
+        frozen, so the grab is handed back for as long as the window is up
+        and taken again afterwards.
+        """
+        seat = self.window.get_display().get_default_seat()
+        seat.ungrab()
+        try:
+            preferences.edit(self.window)
+        finally:
+            self._grab_attempts = 0
+            self._take_grab()
+        # Hover was not tracked while the dialog had the pointer.
+        self.toolbars.set_hover(-1, -1)
+        self.window.queue_draw()
 
     # -- input -------------------------------------------------------------
 
