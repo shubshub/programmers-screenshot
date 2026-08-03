@@ -18,9 +18,15 @@ from .paths import default_directory
 
 FILENAME_FORMAT = "Screenshot_%Y-%m-%d_%H-%M-%S.png"
 
+# Screenshots taken by this tool routinely hold tokens, cookies and .env
+# contents. The default umask would make them 0644 — fine under a 0750 home,
+# not fine once -o or -d points somewhere shared like /tmp. The mode should
+# not depend on where the file happens to land.
+FILE_MODE = 0o600
+
 
 def save(pixbuf, directory=None, output=None):
-    """Write a PNG and return its path."""
+    """Write a PNG, readable only by its owner, and return its path."""
     if output:
         path = os.path.abspath(os.path.expanduser(output))
     else:
@@ -28,6 +34,7 @@ def save(pixbuf, directory=None, output=None):
         path = os.path.join(folder, datetime.now().strftime(FILENAME_FORMAT))
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     pixbuf.savev(path, "png", [], [])
+    os.chmod(path, FILE_MODE)
     return path
 
 

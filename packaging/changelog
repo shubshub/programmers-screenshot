@@ -1,3 +1,16 @@
+programmers-screenshot (0.17.1) noble; urgency=medium
+
+  * Saved screenshots are now mode 0600 rather than whatever the umask
+    allowed, which was world-readable under the default 022. Captures
+    routinely contain tokens and should not widen with -o or -d. This is a
+    behaviour change for anyone writing into a directory they then share.
+  * The Wayland capture path no longer leaves a copy of the raw screen in
+    /tmp when GNOME Shell writes to a path other than the one it was given.
+    The stray file was the unannotated screen, so it outlived any redaction
+    drawn on the capture that was kept.
+
+ -- Shubshub  Mon, 03 Aug 2026 16:50:00 +1200
+
 programmers-screenshot (0.17.0) noble; urgency=medium
 
   * First release.
