@@ -236,16 +236,34 @@ def main():
     check("and after releasing", is_green(read, x + 150, y), read(x + 150, y))
 
     check.section("only one region is undimmed at a time")
+    # Each point is judged against how it looks with nothing marked out at all.
+    # Comparing the two regions to each other instead depended on what the
+    # screenshot behind them happened to be, and flipped when the pointer moved
+    # to a monitor with darker content under the new region.
+    # Exact comparisons, not brightness ratios: revealing shows the screenshot
+    # itself, and dimming is a fixed alpha over it. A ratio is unstable
+    # wherever the screen behind happens to be nearly black.
+    def same(a, b, tolerance=2):
+        return all(abs(one - two) <= tolerance for one, two in zip(a, b))
+
     h = overlay()
     x, y = h.canvas_point()
-    h.drag(x, y, 200, 150)                    # commit a region
-    h.press(x + 900, y)                       # start a second, elsewhere
+    in_new, in_old = (x + 1100, y + 70), (x + 100, y + 70)
+    dim_old = render_overlay(h)(*in_old)      # nothing marked out: all dim
+
+    h.drag(x, y, 200, 150)                    # commit a region round in_old
+    h.press(x + 900, y)                       # start a second round in_new
     h.move(x + 1300, y + 150)
     read = render_overlay(h)
-    inside_new = sum(read(x + 1100, y + 70))
-    inside_old = sum(read(x + 100, y + 70))
-    check("the new one is revealed", inside_new > inside_old,
-          "new %d vs old %d" % (inside_new, inside_old))
+    check("the pending region shows the screenshot, undimmed",
+          same(read(*in_new), pixel(pixbuf, int(in_new[0]), int(in_new[1]))),
+          "%s vs %s in the capture"
+          % (read(*in_new), pixel(pixbuf, int(in_new[0]), int(in_new[1]))))
+    check("the old one is gone, not merely hidden",
+          same(read(*in_old), dim_old),
+          "%s vs %s dimmed" % (read(*in_old), dim_old))
+    check("and it really is off the scene", h.overlay.scene.region is None,
+          h.overlay.scene.region)
 
     # ----------------------------------------------------------------- bake
     check.section("annotations are baked into the captured image")

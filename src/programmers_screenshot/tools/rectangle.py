@@ -12,6 +12,7 @@ class RectangleTool(DragTool):
     name = "rectangle"
     label = "Region"
     settings = ()
+    sets_region = True
 
     def complete(self, start, end, values):
         rect = Rect.from_points(start, end)

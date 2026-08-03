@@ -24,6 +24,10 @@ class Tool:
     icon_text = None  # optional glyph, drawn if draw_icon is not overridden
     settings = ()   # Setting instances this tool exposes
 
+    #: True if a gesture from this tool sets the capture region. Starting one
+    #: drops whatever region is already there.
+    sets_region = False
+
     # -- gesture -----------------------------------------------------------
 
     def begin(self, point, values):
