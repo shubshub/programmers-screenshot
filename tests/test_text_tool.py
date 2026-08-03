@@ -41,6 +41,36 @@ def is_white(rgb, tolerance=6):
     return all(channel >= 255 - tolerance for channel in rgb)
 
 
+def block_coverage(background):
+    """Draw one text block alone; report how much of its box it fills.
+
+    Returns (fraction of the box painted, pixels painted outside the box).
+    """
+    import cairo
+
+    origin = (10, 10)
+    block = TextBlock(origin, ("bare",), RED, 28, background)
+    box = block.box()
+    width, height = int(box.width) + 20, int(box.height) + 20
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+    block.draw(cairo.Context(surface))
+    surface.flush()
+
+    data, stride = surface.get_data(), surface.get_stride()
+    inside = painted = outside = 0
+    for py in range(height):
+        for px in range(width):
+            alpha = data[py * stride + px * 4 + 3]
+            within = (origin[0] <= px < origin[0] + box.width
+                      and origin[1] <= py < origin[1] + box.height)
+            if within:
+                inside += 1
+                painted += 1 if alpha > 200 else 0
+            elif alpha > 40:
+                outside += 1
+    return painted / inside, outside
+
+
 def main():
     Gtk.init_check()
     pixbuf, bounds = capture.capture_screen(Gdk.Display.get_default())
@@ -198,11 +228,17 @@ def main():
     h.click_button("capture")
     check("captured", h.finished and h.result is not None)
     check("the text became an item", len(texts(h)) == 1, texts(h))
-    white = sum(
+
+    # Against the same region captured with nothing typed, so this does not
+    # depend on what the screenshot behind it happens to look like.
+    empty = typing(size=28, background=True)
+    empty.overlay.scene.do(SetRegion(Rect(x - 10, y - 10, 400, 120)))
+    empty.click_button("capture")
+    changed = sum(
         1 for px in range(20, 380, 4) for py in range(20, 100, 4)
-        if is_white(pixel(h.result, px, py))
+        if pixel(h.result, px, py) != pixel(empty.result, px, py)
     )
-    check("its white backing is in the image", white > 40, white)
+    check("the text and its backing reached the image", changed > 200, changed)
 
     check.section("the backing covers the longest line and the whole paragraph")
     for lines in (("short", "a much longer line here"), ("a much longer line here", "short")):
@@ -222,33 +258,16 @@ def main():
                                       doubled.width, doubled.height))
 
     check.section("the backing is painted only when it is switched on")
-    # Counted against a render of the same region with no text at all, since
-    # the screenshot underneath has plenty of white of its own.
-    region = Rect(x - 10, y - 10, 300, 90)
-
-    def white_count(background):
-        h = typing(size=28, background=background)
-        h.overlay.scene.do(SetRegion(region))
-        if background is not None:
-            h.click(x, y)
-            h.type_text("bare")
-        # Through the Capture button, so the text is committed the way it
-        # would be in use — render() alone would miss it.
-        h.click_button("capture")
-        return sum(
-            1 for px in range(5, 295, 3) for py in range(5, 85, 3)
-            if is_white(pixel(h.result, px, py))
-        )
-
-    baseline = white_count(None)
-    without = white_count(False)
-    with_backing = white_count(True)
-    check("backing on paints a solid white block",
-          with_backing > baseline + 100,
-          "%d vs %d baseline" % (with_backing, baseline))
-    check("backing off adds almost none",
-          without < baseline * 1.3 + 30,
-          "%d vs %d baseline" % (without, baseline))
+    # Drawn on its own rather than over the screenshot: counting white pixels
+    # in a capture depends on whatever happens to be behind it.
+    filled_on, outside_on = block_coverage(True)
+    filled_off, outside_off = block_coverage(False)
+    check("backing on fills the box with opaque white",
+          filled_on > 0.9, "%.0f%% of the box" % (filled_on * 100))
+    check("and paints nothing outside it",
+          outside_on == 0, outside_on)
+    check("backing off leaves the box empty apart from the glyphs",
+          filled_off < 0.25, "%.0f%% of the box" % (filled_off * 100))
 
     return check.report()
 

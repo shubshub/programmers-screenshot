@@ -14,7 +14,7 @@ from . import capture, hotkey, notifications, output, tools
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.8.1"
+VERSION = "0.9.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1

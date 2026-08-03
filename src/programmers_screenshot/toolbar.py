@@ -125,6 +125,57 @@ class Toolbar:
         self.hovered = button
         return True
 
+    # -- tooltips ----------------------------------------------------------
+
+    def tooltip_for(self, button):
+        """What to say about a button, or None if it speaks for itself."""
+        if button is None:
+            return None
+        if button.kind == TOOL:
+            return button.tool.label or None
+        if button.kind == CANCEL:
+            return "Close without capturing"
+        if button.kind == SETTING and not button.setting.draws_caption:
+            return button.setting.caption(button.value)
+        return None  # Capture is already a word
+
+    def tooltip_box(self, cr, text, button):
+        """Below the whole bar, centred on the button, kept on the monitor.
+
+        Below the bar rather than below the button, so a tooltip for a tool
+        never lands on top of the settings row.
+        """
+        painting.select_font(cr, theme.FONT_UI, theme.FONT_SIZE_TOOLTIP)
+        width, height = painting.text_size(cr, text)
+        box_width = width + theme.TOOLTIP_PADDING * 2
+        box_height = height + theme.TOOLTIP_PADDING * 2
+
+        below = self.settings_rect.bottom if self.settings_rect else self.rect.bottom
+        x = button.rect.x + (button.rect.width - box_width) / 2
+        left = self.monitor.x + 4
+        right = self.monitor.right - box_width - 4
+        return Rect(
+            min(max(x, left), max(left, right)),
+            below + theme.TOOLTIP_GAP,
+            box_width,
+            box_height,
+        )
+
+    def draw_tooltip(self, cr):
+        """Drawn after everything else, so it sits over the dimmed screen."""
+        text = self.tooltip_for(self.hovered)
+        if not text:
+            return
+        box = self.tooltip_box(cr, text, self.hovered)
+        painting.fill_rounded(cr, box, theme.TOOLTIP_BG, 4)
+        painting.draw_text(
+            cr,
+            text,
+            box.x + theme.TOOLTIP_PADDING,
+            box.y + theme.TOOLTIP_PADDING,
+            theme.TOOLTIP_TEXT,
+        )
+
     # -- drawing -----------------------------------------------------------
 
     def draw(self, cr, active_tool):
