@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.13.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.14.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -55,6 +55,13 @@ takes the whole screen.
 .B Pen
 Draw freehand on the frozen screen, in the colour and thickness chosen on the
 settings row. Annotations are baked into the captured image.
+.TP
+.B Highlighter
+Freehand, like the pen, but laid down as a translucent wash in its own marker
+colours. It tints what is underneath rather than covering it, so text stays
+readable. Translucent rather than multiplied: multiply is what a highlighter
+does on paper and looks better on a light screenshot, but it barely touches a
+dark one, and most screenshots are dark.
 .TP
 .B Line
 Drag out a straight line, a rectangle, an outlined circle, or an arrow,
