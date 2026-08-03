@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.8.1_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.9.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.8.1_all.deb
+sudo apt install ./dist/programmers-screenshot_0.9.0_all.deb
 ```
 
 ## Bind it to a key
@@ -83,6 +83,9 @@ screen.
 | Line | Straight lines, outlined circles and arrows | Shape, colour, thickness |
 | Step | Click to drop numbered badges: 1, 2, 3… | Size, colour |
 | Text | Click, type, click away. Enter makes a new line | Size, backing, colour |
+
+Hovering any toolbar button names it, including the colour swatches and the
+line tool's shape icons, which carry no text of their own.
 
 Tools that have settings get a second toolbar row underneath the first, holding
 just their own options. Setting values are shared by key, so the colour and
@@ -253,6 +256,8 @@ Two things to get right in a new shape: `Item.bounds()` must cover everything
 `constrain()` decides what <kbd>Shift</kbd> does, with `square_corner()` and
 `snap_to_45()` in `geometry.py` covering the usual cases.
 
+`label` is what a hover tooltip says, so give a new tool a readable one.
+
 A tool whose state outlives one gesture — text being typed — implements two
 more. `key_press()` gets first refusal on the keyboard, which is how Enter
 means a newline rather than Capture. `commit()` hands the finished work over,
@@ -272,6 +277,7 @@ python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
 python3 tests/test_line_tool.py       # lines, circles, arrows and Shift
 python3 tests/test_step_tool.py       # numbered badges and undo renumbering
 python3 tests/test_text_tool.py       # typing, committing, and the backing
+python3 tests/test_tooltips.py        # hover labels for tools and settings
 python3 tests/test_redraw.py          # partial redraws leave no stale pixels
 python3 tests/test_notifications.py   # notification wiring and agent handoff
 python3 tests/test_sound.py           # the sound asset, generator and playback

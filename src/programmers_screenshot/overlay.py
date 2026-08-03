@@ -417,6 +417,9 @@ class Overlay:
             self._draw_hint(cr)
 
         self.toolbar.draw(cr, self.active_tool)
+        if not self._dragging:
+            # Hover is not tracked mid-gesture, so it would be stale.
+            self.toolbar.draw_tooltip(cr)
         return True
 
     def _idle(self):

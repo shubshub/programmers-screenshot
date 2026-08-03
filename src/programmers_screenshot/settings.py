@@ -14,6 +14,10 @@ from . import painting, theme
 class Setting:
     """One knob. Subclasses decide what an option looks like."""
 
+    #: True if draw_option() already writes the caption on the bar, in which
+    #: case a tooltip would only repeat it.
+    draws_caption = False
+
     def __init__(self, key, label, default):
         self.key = key
         self.label = label
@@ -22,6 +26,10 @@ class Setting:
     def options(self):
         """The values this setting can take, in display order."""
         raise NotImplementedError
+
+    def caption(self, value):
+        """What to call one option, for a tooltip or a drawn label."""
+        return str(value)
 
     def option_width(self):
         return theme.SETTINGS_OPTION
@@ -33,13 +41,21 @@ class Setting:
 class ColourSetting(Setting):
     """A row of swatches."""
 
-    def __init__(self, key="colour", label="Colour", default=None, swatches=None):
+    def __init__(self, key="colour", label="Colour", default=None, swatches=None,
+                 names=None):
         swatches = tuple(swatches if swatches is not None else theme.PALETTE)
         super().__init__(key, label, default if default is not None else swatches[0])
         self.swatches = swatches
+        self.names = tuple(names if names is not None else theme.PALETTE_NAMES)
 
     def options(self):
         return self.swatches
+
+    def caption(self, value):
+        for swatch, name in zip(self.swatches, self.names):
+            if swatch == value:
+                return name
+        return "Colour"
 
     def draw_option(self, cr, box, value, active):
         centre_x = box.x + box.width / 2
@@ -57,6 +73,8 @@ class ColourSetting(Setting):
 
 class ChoiceSetting(Setting):
     """Segmented buttons, labelled with text."""
+
+    draws_caption = True
 
     def __init__(self, key, label, default, options):
         super().__init__(key, label, default)
@@ -81,6 +99,8 @@ class ChoiceSetting(Setting):
 
 class WidthSetting(ChoiceSetting):
     """Line thickness, drawn as dots of the size you would get."""
+
+    draws_caption = False  # the dots say it, so captions are tooltip text
 
     def draw_option(self, cr, box, value, active):
         if active:
@@ -119,5 +139,6 @@ class SettingValues:
 # Shared instances, so every tool that wants a colour gets the same one.
 COLOUR = ColourSetting()
 WIDTH = WidthSetting(
-    "width", "Width", 4, ((2, "S"), (4, "M"), (8, "L"), (16, "XL"))
+    "width", "Width", 4,
+    ((2, "2 px"), (4, "4 px"), (8, "8 px"), (16, "16 px")),
 )
