@@ -191,6 +191,28 @@ def main():
         output.save(a_pixbuf(), output=victim)
         check("and ends 0600", mode_of(victim) == 0o600, oct(mode_of(victim)))
 
+        check.section("a symlink at the destination is replaced, not followed")
+        # Screenshot names are timestamps, so they are guessable. Saving into
+        # a world-writable directory used to mean anyone could pre-plant a
+        # symlink under the name we were about to use and have the PNG written
+        # straight through it, over a file of theirs choosing that we own.
+        planted = os.path.join(workspace, "planted.png")
+        precious = os.path.join(workspace, "precious.txt")
+        with open(precious, "wb") as handle:
+            handle.write(b"PRECIOUS CONTENTS\n")
+        os.symlink(precious, planted)
+
+        output.save(a_pixbuf(), output=planted)
+        with open(precious, "rb") as handle:
+            after = handle.read()
+        check("the file it pointed at is untouched",
+              after == b"PRECIOUS CONTENTS\n", after[:16])
+        check("the symlink itself was replaced", not os.path.islink(planted))
+        check("and the screenshot landed on the link's own name",
+              open(planted, "rb").read(4) == b"\x89PNG")
+        check("still 0600 through that route", mode_of(planted) == 0o600,
+              oct(mode_of(planted)))
+
         check.section("no working files are left in the destination")
         strays = [
             name for name in os.listdir(workspace)

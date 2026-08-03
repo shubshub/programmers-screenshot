@@ -6,8 +6,12 @@ programmers-screenshot (0.17.1) noble; urgency=medium
     written under a private name and renamed into place, so the image is
     never briefly visible at a readable mode and no half-written PNG
     appears under the final name. This is a behaviour change for anyone
-    writing into a directory they then share, and writing to a symlink now
-    replaces the link rather than its target.
+    writing into a directory they then share.
+  * Saving no longer follows a symlink sitting at the destination. Screenshot
+    names are timestamps and so are guessable, which meant that when saving
+    into a world-writable directory another user could pre-plant a link under
+    the name about to be used and have the PNG written straight through it,
+    over a file of their choosing that you own. The link is now replaced.
   * The Wayland capture path no longer leaves a copy of the raw screen in
     /tmp when GNOME Shell writes to a path other than the one it was given.
     The stray file was the unannotated screen, so it outlived any redaction
