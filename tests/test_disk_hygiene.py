@@ -156,6 +156,49 @@ def main():
               mode_of(witness) == 0o644, oct(mode_of(witness)))
 
         # ------------------------------------------------------------------
+        check.section("it is never linked into place at a readable mode")
+        # Tightening after saving is not enough: the complete image sits under
+        # the final name at the umask's mode until the chmod lands, and a
+        # reader who opens it in that window keeps reading through the fd.
+        # So the destination name must only ever appear via the rename, and
+        # what gets renamed must already be private.
+        seen = {}
+        real_replace = os.replace
+
+        def watch_replace(source, destination):
+            seen["source mode"] = mode_of(source)
+            seen["destination existed"] = os.path.exists(destination)
+            return real_replace(source, destination)
+
+        output.os.replace = watch_replace
+        try:
+            target = os.path.join(workspace, "renamed.png")
+            output.save(a_pixbuf(), output=target)
+        finally:
+            output.os.replace = real_replace
+
+        check("the save went through a rename", "source mode" in seen, seen)
+        check("what was renamed in was already 0600",
+              seen.get("source mode") == 0o600, oct(seen.get("source mode", 0)))
+        check("the final name never existed before the rename",
+              seen.get("destination existed") is False, seen)
+
+        check.section("overwriting does not inherit the old file's mode")
+        victim = os.path.join(workspace, "victim.png")
+        os.close(os.open(victim, os.O_CREAT | os.O_WRONLY, 0o666))
+        check("it starts world-readable", mode_of(victim) == 0o644,
+              oct(mode_of(victim)))
+        output.save(a_pixbuf(), output=victim)
+        check("and ends 0600", mode_of(victim) == 0o600, oct(mode_of(victim)))
+
+        check.section("no working files are left in the destination")
+        strays = [
+            name for name in os.listdir(workspace)
+            if name.startswith(".") and name.endswith(".png")
+        ]
+        check("nothing half-written left behind", not strays, strays)
+
+        # ------------------------------------------------------------------
         check.section("the Wayland capture cleans up after the shell")
 
         shell = FakeShell()

@@ -3,6 +3,7 @@
 import os
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime
 
 import gi
@@ -26,16 +27,45 @@ FILE_MODE = 0o600
 
 
 def save(pixbuf, directory=None, output=None):
-    """Write a PNG, readable only by its owner, and return its path."""
+    """Write a PNG, readable only by its owner, and return its path.
+
+    Written under a private name and moved into place, rather than saved and
+    then tightened. Tightening afterwards leaves a window: the whole image is
+    on disk at the umask's mode — measured at 0644 — before the chmod lands,
+    and that is long enough for another user to open it and keep reading
+    through the descriptor. The rename also means no half-written PNG is ever
+    visible under the final name.
+
+    One consequence worth knowing: if the destination is a symlink, this
+    replaces the link rather than writing through it.
+    """
     if output:
         path = os.path.abspath(os.path.expanduser(output))
     else:
         folder = os.path.abspath(os.path.expanduser(directory or default_directory()))
         path = os.path.join(folder, datetime.now().strftime(FILENAME_FORMAT))
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    pixbuf.savev(path, "png", [], [])
-    os.chmod(path, FILE_MODE)
+
+    folder = os.path.dirname(path) or "."
+    os.makedirs(folder, exist_ok=True)
+
+    # Alongside the destination, so the rename cannot cross a filesystem.
+    handle, temporary = tempfile.mkstemp(dir=folder, prefix=".", suffix=".png")
+    os.close(handle)
+    try:
+        pixbuf.savev(temporary, "png", [], [])
+        os.chmod(temporary, FILE_MODE)  # mkstemp gives 0600; savev may not keep it
+        os.replace(temporary, path)
+    except BaseException:
+        _discard(temporary)
+        raise
     return path
+
+
+def _discard(path):
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 def copy_to_clipboard(pixbuf):
