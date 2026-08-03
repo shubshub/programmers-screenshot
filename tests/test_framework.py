@@ -227,9 +227,14 @@ def main():
     check("gesture really started", h.overlay._dragging)
     read = render_overlay(h)
     check("still visible mid-drag", is_green(read, x + 150, y), read(x + 150, y))
+    # Against the screenshot itself at the same point, not against a different
+    # point on screen: revealing shows the capture untouched, and comparing two
+    # locations only worked while the content inside happened to be brighter.
+    inside = (int(x + 380), int(y - 40))
     check("the region under it is undimmed",
-          sum(read(x + 380, y - 40)) > sum(read(x + 900, y)),
-          "%s inside vs %s outside" % (read(x + 380, y - 40), read(x + 900, y)))
+          all(abs(one - two) <= 2
+              for one, two in zip(read(*inside), pixel(pixbuf, *inside))),
+          "%s vs %s in the capture" % (read(*inside), pixel(pixbuf, *inside)))
 
     h.release(x + 400, y - 60)
     read = render_overlay(h)

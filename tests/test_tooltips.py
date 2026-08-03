@@ -76,7 +76,7 @@ def main():
     h = Harness(pixbuf, bounds)
     h.use_tool("line")
     wanted = {
-        "shape": {"Line", "Circle", "Arrow"},
+        "shape": {"Line", "Rectangle", "Circle", "Arrow"},
         "width": {"2 px", "4 px", "8 px", "16 px"},
         "colour": {"Red", "Amber", "Green", "Blue", "White", "Black"},
     }

@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.10.1_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.11.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.10.1_all.deb
+sudo apt install ./dist/programmers-screenshot_0.11.0_all.deb
 ```
 
 ## Bind it to a key
@@ -80,7 +80,7 @@ screen.
 | --- | --- | --- |
 | Region | Drag to set what gets captured; a new drag replaces it, a click clears it | — |
 | Pen | Draw freehand on the frozen screen | Colour, thickness |
-| Line | Straight lines, outlined circles and arrows | Shape, colour, thickness |
+| Line | Straight lines, rectangles, outlined circles and arrows | Shape, colour, thickness |
 | Step | Click to drop numbered badges: 1, 2, 3… | Size, colour |
 | Text | Click, type, click away. Enter makes a new line | Size, backing, colour |
 
@@ -92,7 +92,7 @@ just their own options. Setting values are shared by key, so the colour and
 thickness you pick for the pen are the ones the line tool uses too.
 
 Hold <kbd>Shift</kbd> while dragging to constrain: the region and the circle go
-square, lines and arrows snap to 45° angles.
+square, the rectangle too, and lines and arrows snap to 45° angles.
 
 ## Options
 
@@ -176,7 +176,7 @@ src/programmers_screenshot/
         items.py                  Item, and the shapes that get drawn
         rectangle.py              the region tool
         pen.py                    freehand drawing
-        line.py                   lines, circles and arrows
+        line.py                   lines, rectangles, circles and arrows
         step.py                   numbered step badges
         text.py                   typing, with an optional white backing
         __init__.py               ALL_TOOLS — the registry

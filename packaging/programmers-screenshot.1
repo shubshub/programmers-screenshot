@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.10.1" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.11.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -57,9 +57,9 @@ Draw freehand on the frozen screen, in the colour and thickness chosen on the
 settings row. Annotations are baked into the captured image.
 .TP
 .B Line
-Drag out a straight line, an outlined circle, or an arrow, whichever is chosen
-on the settings row. The circle is an outline inscribed in the drag, so it
-never hides what it is drawn around.
+Drag out a straight line, a rectangle, an outlined circle, or an arrow,
+whichever is chosen on the settings row. The rectangle and the circle are
+outlines, so neither hides what it is drawn around.
 .TP
 .B Step
 Click to drop a numbered badge, counting 1, 2, 3 and on as you go, for marking
@@ -78,8 +78,8 @@ The box is always white; only the text takes the chosen colour.
 .PP
 Holding
 .B Shift
-while dragging constrains it: the region and the circle go square, and lines
-and arrows snap to 45 degree angles.
+while dragging constrains it: the region, the rectangle and the circle go
+square, and lines and arrows snap to 45 degree angles.
 .PP
 A tool that has settings gets a second toolbar row beneath the first, holding
 its own options. Setting values are shared between tools, so a colour chosen

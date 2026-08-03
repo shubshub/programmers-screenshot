@@ -1,6 +1,6 @@
-"""Straight lines, outlined circles and arrows.
+"""Straight lines, rectangles, outlined circles and arrows.
 
-One tool with a shape selector rather than three: all three are the same
+One tool with a shape selector rather than four: they are all the same
 gesture, and they share the same colour and thickness, so putting them behind
 one button keeps the toolbar short.
 """
@@ -9,13 +9,14 @@ from .. import painting, theme
 from ..geometry import snap_to_45, square_corner
 from ..settings import COLOUR, WIDTH, ChoiceSetting
 from .base import ShapeTool
-from .items import Arrow, Ellipse, Line
+from .items import Arrow, Box, Ellipse, Line
 
 LINE = "line"
+BOX = "box"
 CIRCLE = "circle"
 ARROW = "arrow"
 
-SHAPES = {LINE: Line, CIRCLE: Ellipse, ARROW: Arrow}
+SHAPES = {LINE: Line, BOX: Box, CIRCLE: Ellipse, ARROW: Arrow}
 
 
 class ShapeSetting(ChoiceSetting):
@@ -35,12 +36,13 @@ class ShapeSetting(ChoiceSetting):
 
 
 SHAPE = ShapeSetting(
-    "shape", "Shape", LINE, ((LINE, "Line"), (CIRCLE, "Circle"), (ARROW, "Arrow"))
+    "shape", "Shape", LINE,
+    ((LINE, "Line"), (BOX, "Rectangle"), (CIRCLE, "Circle"), (ARROW, "Arrow")),
 )
 
 
 class LineTool(ShapeTool):
-    """Drag out a line, an outlined circle, or an arrow."""
+    """Drag out a line, a rectangle, an outlined circle, or an arrow."""
 
     name = "line"
     label = "Line"
@@ -58,8 +60,8 @@ class LineTool(ShapeTool):
         )
 
     def constrain(self, start, end, values):
-        """Shift squares a circle off, and snaps a line or arrow to 45s."""
-        if values.get("shape") == CIRCLE:
+        """Shift squares off the boxed shapes, and snaps a line or arrow to 45s."""
+        if values.get("shape") in (BOX, CIRCLE):
             return square_corner(start, end)
         return snap_to_45(start, end)
 
