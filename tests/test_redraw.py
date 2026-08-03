@@ -212,6 +212,22 @@ def main():
         wrong = screen.differences_from_full_repaint()
         check("%s matches a full repaint" % shape, not wrong, describe(wrong))
 
+    check.section("a highlighter stroke leaves nothing behind")
+    from programmers_screenshot.tools.highlight import THICKNESS  # noqa: E402
+
+    h = Harness(pixbuf, bounds)
+    screen = Screen(h, bounds)
+    screen.prime()
+    h.use_tool("highlight")
+    h.overlay.values.set(THICKNESS, 32)
+    h.press(x, y)
+    screen.flush()
+    for step in range(1, 34):
+        h.move(x + step * 22, y + (step % 8) * 18)
+        screen.flush()
+    wrong = screen.differences_from_full_repaint()
+    check("matches a full repaint", not wrong, describe(wrong))
+
     check.section("dragging out a pixelated area leaves nothing behind")
     h = Harness(pixbuf, bounds)
     screen = Screen(h, bounds)
