@@ -91,7 +91,7 @@ def main():
     check.section("the tool is registered with its own size setting")
     h = counting()
     check("step tool present", any(t.name == "step" for t in h.overlay.tools))
-    keys = {b.setting.key for b in h.overlay.toolbar.setting_buttons}
+    keys = {b.setting.key for b in h.bar.setting_buttons}
     check("settings are size and colour", keys == {"step-size", "colour"}, keys)
     check("size does not share the width key", "width" not in keys)
 
