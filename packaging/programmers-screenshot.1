@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.15.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.16.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -75,6 +75,17 @@ covers. A drag along an axis reads as a single number; anything else shows
 width, height and the diagonal. Holding Shift snaps to 45 degrees, which is
 how you get an exactly horizontal or vertical reading. The measurement is
 committed like any other annotation, so it ends up in the capture.
+.TP
+.B Colour picker
+Click a pixel and its colour goes on the clipboard, as
+.B #RRGGBB
+or as
+.BR rgb() ,
+whichever the settings row says. A swatch and the value are shown where you
+clicked so you can see that it worked. Nothing is added to the drawing, so
+there is nothing to undo and nothing of it in the capture. Capturing puts the
+image on the clipboard and so replaces the colour: press Escape instead if the
+colour is what you came for.
 .TP
 .B Redact
 Drag out a bar that covers something completely, in black or white. The fill

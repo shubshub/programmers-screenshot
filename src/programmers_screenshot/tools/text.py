@@ -131,7 +131,7 @@ class TextTool(Tool):
         """Apply size, backing and colour to the text already being typed,
         rather than only to the next one."""
         if self.editing:
-            self._values = values.snapshot(self.settings)
+            self._values = values
 
     def cancel(self):
         self._origin = None

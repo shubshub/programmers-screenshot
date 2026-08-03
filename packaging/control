@@ -25,7 +25,8 @@ Description: Minimal region screenshot tool for hotkey binding
  Tools are pluggable: a new one is a single file plus a registry line.
  .
  Includes region, freehand pen, highlighter, line/rectangle/circle/arrow,
- measurement, redaction, pixelation, numbered step and text tools.
+ measurement, colour picking, redaction, pixelation, numbered step and
+ text tools.
  .
  It does one thing on one keypress: no editor, no dialogs, no upload
  prompts. Register a GNOME shortcut with --install-hotkey, or point any

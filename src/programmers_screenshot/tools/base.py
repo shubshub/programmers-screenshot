@@ -51,10 +51,12 @@ class Tool:
     def settings_changed(self, values):
         """A setting was changed while this tool is active.
 
+        `values` is a fresh snapshot, the same shape begin() is handed.
+
         Gesture tools ignore this: they take a snapshot at begin() so a stroke
         keeps the colour it started with, and nothing can be clicked mid-drag
-        anyway. A tool with an editing session that outlives one gesture
-        re-reads them here, so the change shows on what is already on screen.
+        anyway. A tool with state that outlives one gesture re-reads them here,
+        so the change shows on what is already on screen.
         """
 
     def commit(self):
