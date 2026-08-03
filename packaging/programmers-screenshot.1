@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.16.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.17.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -173,10 +173,19 @@ Do not play the shutter sound.
 .TP
 .BR \-\-install\-hotkey " [" \fIACCEL\fR ]
 Register a GNOME custom shortcut that runs this command. \fIACCEL\fR is a
-GTK accelerator string and defaults to \fB<Shift><Super>s\fR.
+GTK accelerator string and defaults to \fBPrint\fR.
+.IP
+GNOME holds Print for its own screenshot UI, and a custom shortcut does not
+reliably win while it does, so this switches the built-in off and reports
+what it took. The old value is written to
+.I ~/.config/programmers-screenshot/displaced.json
+and
+.B \-\-uninstall\-hotkey
+puts it back. An accelerator nobody holds disturbs nothing.
 .TP
 .B \-\-uninstall\-hotkey
-Remove the shortcut registered by \fB\-\-install\-hotkey\fR.
+Remove the shortcut registered by \fB\-\-install\-hotkey\fR, and restore any
+GNOME binding it displaced.
 .TP
 .B \-\-version
 Print the version and exit.
@@ -194,6 +203,9 @@ The options given were contradictory.
 .TP
 .I ~/Pictures/Screenshots
 Default output directory, created on first use.
+.TP
+.I ~/.config/programmers-screenshot/displaced.json
+GNOME shortcuts switched off to free the hotkey, kept so they can be restored.
 .SH NOTES
 Under X11 the screen is captured directly from the root window. Under Wayland
 it goes through the
