@@ -27,7 +27,12 @@ from programmers_screenshot import capture  # noqa: E402
 from programmers_screenshot.actions import SetRegion  # noqa: E402
 from programmers_screenshot.geometry import Rect  # noqa: E402
 from programmers_screenshot.settings import COLOUR, WIDTH  # noqa: E402
-from programmers_screenshot.tools.items import Arrow, Ellipse, Line  # noqa: E402
+from programmers_screenshot.tools.items import (  # noqa: E402
+    Arrow,
+    Box,
+    Ellipse,
+    Line,
+)
 from programmers_screenshot.tools.line import SHAPE  # noqa: E402
 
 RED = (1.0, 0.0, 0.0)
@@ -60,10 +65,12 @@ def main():
           keys == {"shape", "colour", "width"}, keys)
     shapes = [b.value for b in h.bar.setting_buttons
               if b.setting.key == "shape"]
-    check("three shapes offered", shapes == ["line", "circle", "arrow"], shapes)
+    check("four shapes offered",
+          shapes == ["line", "box", "circle", "arrow"], shapes)
 
     check.section("each shape commits its own kind of item")
-    for shape, kind in (("line", Line), ("circle", Ellipse), ("arrow", Arrow)):
+    for shape, kind in (("line", Line), ("box", Box), ("circle", Ellipse),
+                        ("arrow", Arrow)):
         h = drawing(shape)
         x, y = h.canvas_point()
         h.drag(x, y, 300, 200)
@@ -75,7 +82,7 @@ def main():
               items[0].colour == RED and items[0].width == 12)
 
     check.section("a click leaves nothing")
-    for shape in ("line", "circle", "arrow"):
+    for shape in ("line", "box", "circle", "arrow"):
         h = drawing(shape)
         h.click(*h.canvas_point())
         check("%s: no item from a click" % shape, not h.items, h.items)
@@ -135,6 +142,29 @@ def main():
     tip_column = [pixel(baked, 268, row) for row in range(10, 70)]
     check("arrow: has a head at the tip", sum(1 for p in tip_column if is_red(p)) >= 2,
           sum(1 for p in tip_column if is_red(p)))
+
+    check.section("the rectangle is an outline, not a filled block")
+    h = drawing("box", width=10)
+    h.drag(x, y, 300, 200, steps=6)
+    h.overlay.scene.do(SetRegion(Rect(x, y, 300, 200)))
+    baked = h.overlay.render()
+    top_edge = [pixel(baked, column, 4) for column in range(40, 260, 10)]
+    check("box: painted along the top edge",
+          sum(1 for p in top_edge if is_red(p)) > 15,
+          sum(1 for p in top_edge if is_red(p)))
+    left_edge = [pixel(baked, 4, row) for row in range(40, 160, 10)]
+    check("box: painted down the left edge",
+          sum(1 for p in left_edge if is_red(p)) > 8,
+          sum(1 for p in left_edge if is_red(p)))
+    check("box: hollow in the middle", not is_red(pixel(baked, 150, 100)),
+          pixel(baked, 150, 100))
+
+    check.section("shift squares the rectangle off too")
+    h = drawing("box")
+    h.drag(x, y, 300, 180, steps=3, shift=True)
+    box = Rect.from_points(h.items[0].start, h.items[0].end)
+    check("box squared off", abs(box.width - box.height) < 0.5,
+          "%.1f x %.1f" % (box.width, box.height))
 
     check.section("the circle is an outline, not a disc")
     h = drawing("circle", width=10)

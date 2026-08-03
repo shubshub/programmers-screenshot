@@ -113,6 +113,20 @@ class Line(Shape):
         cr.restore()
 
 
+class Box(Shape):
+    """A rectangle outline round the drag. Stroke only, like the ellipse."""
+
+    def draw(self, cr):
+        rect = Rect.from_points(self.start, self.end)
+        if not rect:
+            return
+        cr.save()
+        self._stroke_style(cr)
+        cr.rectangle(rect.x, rect.y, rect.width, rect.height)
+        cr.stroke()
+        cr.restore()
+
+
 class Ellipse(Shape):
     """An outline inscribed in the drag box. Stroke only: never hides what is
     behind it, which is the point of ringing something."""

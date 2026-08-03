@@ -13,7 +13,7 @@ preview, the undo entry and inclusion in the captured image all follow.
 """
 
 from .base import DragTool, ShapeTool, Tool
-from .items import Arrow, Ellipse, Item, Line, Shape, Stroke
+from .items import Arrow, Box, Ellipse, Item, Line, Shape, Stroke
 from .line import LineTool
 from .pen import PenTool
 from .rectangle import RectangleTool
@@ -25,6 +25,7 @@ ALL_TOOLS = (RectangleTool, PenTool, LineTool, StepTool, TextTool)
 __all__ = [
     "ALL_TOOLS",
     "Arrow",
+    "Box",
     "DragTool",
     "Ellipse",
     "Item",
