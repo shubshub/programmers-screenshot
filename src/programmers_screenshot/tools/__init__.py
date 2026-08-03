@@ -20,12 +20,14 @@ from .items import (
     Highlight,
     Item,
     Line,
+    Measurement,
     Redaction,
     Shape,
     Stroke,
 )
 from .highlight import HighlighterTool
 from .line import LineTool
+from .measure import MeasureTool
 from .pen import PenTool
 from .pixelate import PixelateTool
 from .rectangle import RectangleTool
@@ -38,6 +40,7 @@ ALL_TOOLS = (
     PenTool,
     HighlighterTool,
     LineTool,
+    MeasureTool,
     RedactTool,
     PixelateTool,
     StepTool,
@@ -53,6 +56,7 @@ __all__ = [
     "Highlight",
     "Item",
     "Line",
+    "Measurement",
     "Redaction",
     "Shape",
     "ShapeTool",
