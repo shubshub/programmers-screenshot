@@ -55,10 +55,10 @@ def main():
     h = Harness(pixbuf, bounds)
     check("line tool present", any(t.name == "line" for t in h.overlay.tools))
     h.use_tool("line")
-    keys = {b.setting.key for b in h.overlay.toolbar.setting_buttons}
+    keys = {b.setting.key for b in h.bar.setting_buttons}
     check("settings row has shape, colour and width",
           keys == {"shape", "colour", "width"}, keys)
-    shapes = [b.value for b in h.overlay.toolbar.setting_buttons
+    shapes = [b.value for b in h.bar.setting_buttons
               if b.setting.key == "shape"]
     check("three shapes offered", shapes == ["line", "circle", "arrow"], shapes)
 

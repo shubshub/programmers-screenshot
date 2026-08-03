@@ -90,11 +90,11 @@ def main():
     check.section("the tool is registered with its own size and backing")
     h = typing()
     check("text tool present", any(t.name == "text" for t in h.overlay.tools))
-    keys = {b.setting.key for b in h.overlay.toolbar.setting_buttons}
+    keys = {b.setting.key for b in h.bar.setting_buttons}
     check("size, backing and colour", keys == {"text-size", "text-background", "colour"},
           keys)
     check("size does not share the width key", "width" not in keys)
-    backing = [b.value for b in h.overlay.toolbar.setting_buttons
+    backing = [b.value for b in h.bar.setting_buttons
                if b.setting.key == "text-background"]
     check("backing is just off or on", backing == [False, True], backing)
 
@@ -173,7 +173,7 @@ def main():
     tool = h.overlay.active_tool
 
     def setting_button(key, value):
-        return next(b for b in h.overlay.toolbar.setting_buttons
+        return next(b for b in h.bar.setting_buttons
                     if b.setting.key == key and b.value == value)
 
     def press_setting(key, value):

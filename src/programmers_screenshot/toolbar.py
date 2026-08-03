@@ -17,6 +17,54 @@ CANCEL = "cancel"
 SETTING = "setting"
 
 
+class Toolbars:
+    """One bar per monitor, kept in step.
+
+    The overlay talks to this the way it used to talk to a single bar. The
+    tools, the settings and the scene stay single, so every bar is a view of
+    the same state: pick a tool on one and it lights up on all of them.
+    """
+
+    def __init__(self, tools, monitors, values):
+        self.bars = [Toolbar(tools, monitor, values) for monitor in monitors]
+
+    @property
+    def primary(self):
+        """The bar on the monitor the pointer started on; first in the list."""
+        return self.bars[0]
+
+    def covers(self, x, y):
+        return any(bar.covers(x, y) for bar in self.bars)
+
+    def button_at(self, x, y):
+        for bar in self.bars:
+            button = bar.button_at(x, y)
+            if button is not None:
+                return button
+        return None
+
+    def show_settings_for(self, tool):
+        for bar in self.bars:
+            bar.show_settings_for(tool)
+
+    def set_hover(self, x, y):
+        """Every bar is told, so the one being left stops looking hovered."""
+        changed = False
+        for bar in self.bars:
+            if bar.set_hover(x, y):
+                changed = True
+        return changed
+
+    def draw(self, cr, active_tool):
+        for bar in self.bars:
+            bar.draw(cr, active_tool)
+
+    def draw_tooltip(self, cr):
+        # Only the hovered bar has anything to say, so this draws at most one.
+        for bar in self.bars:
+            bar.draw_tooltip(cr)
+
+
 @dataclass
 class Button:
     kind: str
