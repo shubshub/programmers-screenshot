@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.11.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.12.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -60,6 +60,14 @@ settings row. Annotations are baked into the captured image.
 Drag out a straight line, a rectangle, an outlined circle, or an arrow,
 whichever is chosen on the settings row. The rectangle and the circle are
 outlines, so neither hides what it is drawn around.
+.TP
+.B Redact
+Drag out a bar that covers something completely, in black or white. The fill
+replaces the pixels underneath, so nothing of the original survives into the
+saved PNG. This matters: pixelating or blurring a secret only averages the
+pixels, and those averages leak \- pixelated text can be recovered by
+rendering candidate strings, pixelating them the same way and matching. Use
+this for tokens, keys and addresses.
 .TP
 .B Step
 Click to drop a numbered badge, counting 1, 2, 3 and on as you go, for marking

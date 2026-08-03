@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.11.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.12.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.11.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.12.0_all.deb
 ```
 
 ## Bind it to a key
@@ -81,8 +81,15 @@ screen.
 | Region | Drag to set what gets captured; a new drag replaces it, a click clears it | — |
 | Pen | Draw freehand on the frozen screen | Colour, thickness |
 | Line | Straight lines, rectangles, outlined circles and arrows | Shape, colour, thickness |
+| Redact | Drag a bar that covers something completely | Fill (black or white) |
 | Step | Click to drop numbered badges: 1, 2, 3… | Size, colour |
 | Text | Click, type, click away. Enter makes a new line | Size, backing, colour |
+
+**Redaction replaces the pixels.** The bar is opaque, so nothing of what was
+underneath survives into the saved PNG. That matters: pixelating or blurring a
+secret only *averages* the pixels, and those averages leak — pixelated text can
+be recovered by rendering candidate strings, pixelating them the same way and
+matching. Use the redaction bar for tokens, keys and addresses.
 
 Hovering any toolbar button names it, including the colour swatches and the
 line tool's shape icons, which carry no text of their own.
@@ -177,6 +184,7 @@ src/programmers_screenshot/
         rectangle.py              the region tool
         pen.py                    freehand drawing
         line.py                   lines, rectangles, circles and arrows
+        redact.py                 solid bars that cover things up
         step.py                   numbered step badges
         text.py                   typing, with an optional white backing
         __init__.py               ALL_TOOLS — the registry
@@ -280,6 +288,7 @@ to a core module to pass, the framework has stopped doing its job.
 python3 tests/test_framework.py       # scene, settings, tools, adding a tool
 python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
 python3 tests/test_line_tool.py       # lines, circles, arrows and Shift
+python3 tests/test_redact_tool.py     # the bar is opaque, nothing survives
 python3 tests/test_step_tool.py       # numbered badges and undo renumbering
 python3 tests/test_text_tool.py       # typing, committing, and the backing
 python3 tests/test_tooltips.py        # hover labels for tools and settings
