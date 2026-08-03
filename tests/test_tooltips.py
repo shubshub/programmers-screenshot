@@ -54,23 +54,23 @@ def main():
         button = h.button(toolbar.TOOL, name)
         h.move(*centre(button.rect))
         check("%s -> %r" % (name, factory.label),
-              h.overlay.toolbar.tooltip_for(h.overlay.toolbar.hovered) == factory.label,
-              h.overlay.toolbar.tooltip_for(h.overlay.toolbar.hovered))
+              h.bar.tooltip_for(h.bar.hovered) == factory.label,
+              h.bar.tooltip_for(h.bar.hovered))
 
     check.section("the other buttons")
     h.move(*centre(h.button(toolbar.CANCEL).rect))
     check("the cross explains itself",
-          h.overlay.toolbar.tooltip_for(h.overlay.toolbar.hovered)
+          h.bar.tooltip_for(h.bar.hovered)
           == "Close without capturing",
-          h.overlay.toolbar.tooltip_for(h.overlay.toolbar.hovered))
+          h.bar.tooltip_for(h.bar.hovered))
     h.move(*centre(h.button(toolbar.CAPTURE).rect))
     check("Capture needs none, it is already a word",
-          h.overlay.toolbar.tooltip_for(h.overlay.toolbar.hovered) is None)
+          h.bar.tooltip_for(h.bar.hovered) is None)
 
     check.section("moving away clears it")
     h.move(*h.canvas_point())
-    check("nothing hovered", h.overlay.toolbar.hovered is None)
-    check("no tooltip", h.overlay.toolbar.tooltip_for(h.overlay.toolbar.hovered) is None)
+    check("nothing hovered", h.bar.hovered is None)
+    check("no tooltip", h.bar.tooltip_for(h.bar.hovered) is None)
 
     check.section("settings that draw pictures get names")
     h = Harness(pixbuf, bounds)
@@ -81,25 +81,25 @@ def main():
         "colour": {"Red", "Amber", "Green", "Blue", "White", "Black"},
     }
     for key, expected in wanted.items():
-        buttons = [b for b in h.overlay.toolbar.setting_buttons if b.setting.key == key]
-        said = {h.overlay.toolbar.tooltip_for(b) for b in buttons}
+        buttons = [b for b in h.bar.setting_buttons if b.setting.key == key]
+        said = {h.bar.tooltip_for(b) for b in buttons}
         check("%s options are named" % key, said == expected, sorted(s or "-" for s in said))
 
     check.section("settings that already show their caption do not repeat it")
     h = Harness(pixbuf, bounds)
     h.use_tool("text")
     for key in ("text-size", "text-background"):
-        buttons = [b for b in h.overlay.toolbar.setting_buttons if b.setting.key == key]
+        buttons = [b for b in h.bar.setting_buttons if b.setting.key == key]
         check("%s stays quiet" % key,
-              all(h.overlay.toolbar.tooltip_for(b) is None for b in buttons))
+              all(h.bar.tooltip_for(b) is None for b in buttons))
 
     check.section("the box stays on the monitor")
     h = Harness(pixbuf, bounds)
     monitor = h.overlay.monitor
     for kind, name in ((toolbar.TOOL, "rectangle"), (toolbar.CANCEL, None)):
         button = h.button(kind, name)
-        text = h.overlay.toolbar.tooltip_for(button)
-        box = h.overlay.toolbar.tooltip_box(cr, text, button)
+        text = h.bar.tooltip_for(button)
+        box = h.bar.tooltip_box(cr, text, button)
         check("%s: left edge on screen" % (name or "cancel"),
               box.x >= monitor.x, box.x)
         check("%s: right edge on screen" % (name or "cancel"),
@@ -109,12 +109,12 @@ def main():
     h = Harness(pixbuf, bounds)
     h.use_tool("pen")  # pen has settings, so there are two rows
     button = h.button(toolbar.TOOL, "pen")
-    box = h.overlay.toolbar.tooltip_box(cr, "Pen", button)
-    bar = h.overlay.toolbar
+    box = h.bar.tooltip_box(cr, "Pen", button)
+    bar = h.bar
     check("clears the settings row",
           box.y >= bar.settings_rect.bottom, "%.0f vs %.0f" % (box.y, bar.settings_rect.bottom))
     h.use_tool("rectangle")  # no settings row
-    box = h.overlay.toolbar.tooltip_box(cr, "Region", button)
+    box = h.bar.tooltip_box(cr, "Region", button)
     check("sits just under the bar when there is no settings row",
           box.y >= bar.rect.bottom, "%.0f vs %.0f" % (box.y, bar.rect.bottom))
 
@@ -124,18 +124,18 @@ def main():
     h = Harness(pixbuf, bounds)
     hovered_button = h.button(toolbar.TOOL, "pen")
     h.move(*centre(hovered_button.rect))
-    check("hovered before the drag", h.overlay.toolbar.hovered is not None)
+    check("hovered before the drag", h.bar.hovered is not None)
 
     x, y = h.canvas_point()
     h.press(x, y)
     h.move(x + 80, y + 40)
     check("still dragging", h.overlay._dragging)
     check("and still hovering that button, staleley",
-          h.overlay.toolbar.hovered is hovered_button)
+          h.bar.hovered is hovered_button)
 
-    box = h.overlay.toolbar.tooltip_box(cr, "Pen", hovered_button)
+    box = h.bar.tooltip_box(cr, "Pen", hovered_button)
     drawn = render_area(h, bounds, box)
-    h.overlay.toolbar.hovered = None
+    h.bar.hovered = None
     blank = render_area(h, bounds, box)
     check("the tooltip area is untouched while dragging", drawn == blank,
           "%d bytes differ" % sum(1 for a, b in zip(drawn, blank) if a != b))

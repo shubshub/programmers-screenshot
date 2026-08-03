@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.9.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.10.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.9.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.10.0_all.deb
 ```
 
 ## Bind it to a key
@@ -124,8 +124,13 @@ through the `org.gnome.Shell.Screenshot` D-Bus interface, so a GNOME session is
 required there.
 
 The overlay spans the full virtual screen rather than a single monitor, so
-selections can cross monitor boundaries. The toolbar goes on whichever monitor
-the pointer was on when the hotkey fired. Clipboard ownership is handed to
+selections can cross monitor boundaries. Every monitor gets its own copy of the
+toolbar, each laid out to that screen's width, and they are all views of the
+same state — pick a tool on one and it lights up on the rest. The cost is that
+the toolbar strip is not a drawing surface on *any* screen, so a drag cannot be
+started under it anywhere; dragging upward into it still works.
+
+Clipboard ownership is handed to
 `xclip` (or `wl-copy` on Wayland) so the image survives after the process exits.
 
 The notification's buttons need a process alive to receive the click, but the
@@ -162,7 +167,7 @@ src/programmers_screenshot/
     cli.py                        argument parsing and the top-level flow
     capture.py                    reading pixels (X11 root, or GNOME D-Bus)
     overlay.py                    the modal window: events, drawing, grabs
-    toolbar.py                    both bar rows: layout, hit testing, drawing
+    toolbar.py                    one bar per monitor; rows, hit testing, drawing
     scene.py                      region + annotations, and undo/redo
     actions.py                    the undoable changes a tool can make
     settings.py                   Setting types and their shared values
@@ -278,6 +283,7 @@ python3 tests/test_line_tool.py       # lines, circles, arrows and Shift
 python3 tests/test_step_tool.py       # numbered badges and undo renumbering
 python3 tests/test_text_tool.py       # typing, committing, and the backing
 python3 tests/test_tooltips.py        # hover labels for tools and settings
+python3 tests/test_multi_monitor.py   # a toolbar per screen, sharing one state
 python3 tests/test_redraw.py          # partial redraws leave no stale pixels
 python3 tests/test_notifications.py   # notification wiring and agent handoff
 python3 tests/test_sound.py           # the sound asset, generator and playback

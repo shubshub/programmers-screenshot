@@ -156,8 +156,14 @@ class Harness:
 
     # -- positions ---------------------------------------------------------
 
+    @property
+    def bar(self):
+        """The toolbar on the monitor the pointer is on. There is one on each
+        monitor now; this is the one tests interact with."""
+        return self.overlay.toolbars.primary
+
     def button(self, kind, tool_name=None):
-        for candidate in self.overlay.toolbar.buttons:
+        for candidate in self.bar.buttons:
             if candidate.kind == kind and (
                 tool_name is None or getattr(candidate.tool, "name", None) == tool_name
             ):
