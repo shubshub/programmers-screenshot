@@ -1,0 +1,18 @@
+programmers-screenshot (0.17.0) noble; urgency=medium
+
+  * First release.
+  * Region screenshot tool bound to a hotkey, defaulting to Print. Freezes
+    the screen, puts a toolbar on every monitor, and captures on demand.
+  * Ten tools: region, freehand pen, highlighter, line/rectangle/circle/
+    arrow, measure, redaction, pixelation, colour picker, numbered steps
+    and text. Adding another is one file plus a registry line.
+  * Undo and redo over everything, including setting the capture region.
+  * Result goes to the clipboard and to ~/Pictures/Screenshots, with the
+    path on standard output so it composes in scripts.
+  * Shutter sound, and a notification offering to open the image or show it
+    in its folder.
+  * Hover tooltips on every toolbar button.
+  * Installing the hotkey frees whatever GNOME binding holds the key and
+    restores it on uninstall.
+
+ -- Shubshub  Mon, 03 Aug 2026 15:20:00 +1200
