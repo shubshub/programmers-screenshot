@@ -126,17 +126,34 @@ def region_outline(cr, rect):
     cr.fill()
 
 
+LABEL_PAD_X = 8
+LABEL_PAD_Y = 5
+
+
+def label_box(cr, text, x, y, centred=False):
+    """Where a readout of `text` would sit, anchored at (x, y)."""
+    select_font(cr, theme.FONT_MONO, theme.FONT_SIZE_LABEL)
+    width, height = text_size(cr, text)
+    box = Rect(x, y, width + LABEL_PAD_X * 2, height + LABEL_PAD_Y * 2)
+    if centred:
+        return Rect(x - box.width / 2, y - box.height / 2, box.width, box.height)
+    return box
+
+
+def draw_label(cr, text, box):
+    """A small dark readout. Used for the region's size and the ruler's."""
+    fill_rounded(cr, box, theme.LABEL_BG, 4)
+    select_font(cr, theme.FONT_MONO, theme.FONT_SIZE_LABEL)
+    draw_text(cr, text, box.x + LABEL_PAD_X, box.y + LABEL_PAD_Y, theme.LABEL_TEXT)
+
+
 def size_label(cr, canvas, rect):
     """Pixel dimensions, above the region, or tucked inside if there is no
     room above."""
     pixels = rect.scaled(canvas.scale).rounded()
     text = "%d × %d" % (pixels.width, pixels.height)
-    select_font(cr, theme.FONT_MONO, theme.FONT_SIZE_LABEL)
-    width, height = text_size(cr, text)
-
-    pad_x, pad_y = 8, 5
-    box = Rect(rect.x, rect.y - height - pad_y * 2 - 6,
-               width + pad_x * 2, height + pad_y * 2)
+    box = label_box(cr, text, rect.x, 0)
+    box = Rect(box.x, rect.y - box.height - 6, box.width, box.height)
     if box.y < canvas.bounds.y:
         box = Rect(box.x, rect.y + 6, box.width, box.height)
     box = Rect(
@@ -145,6 +162,4 @@ def size_label(cr, canvas, rect):
         box.width,
         box.height,
     )
-
-    fill_rounded(cr, box, theme.LABEL_BG, 4)
-    draw_text(cr, text, box.x + pad_x, box.y + pad_y, theme.LABEL_TEXT)
+    draw_label(cr, text, box)

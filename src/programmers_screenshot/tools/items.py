@@ -74,6 +74,73 @@ class Stroke(Item):
         )
 
 
+class Measurement(Item):
+    """A dimension line with the distance written on it.
+
+    The numbers are physical pixels, which is what anyone measuring a screen
+    actually wants; `scale` is carried so the item can work them out for
+    itself, since drawing is not handed a canvas.
+    """
+
+    LINE_WIDTH = 2.0
+    TICK = 7.0
+    AXIS_TOLERANCE = 2.0  # physical px; below this a drag counts as straight
+
+    def __init__(self, start, end, colour, scale):
+        self.start = start
+        self.end = end
+        self.colour = colour
+        self.scale = scale
+
+    def spans(self):
+        """Width, height and diagonal, in physical pixels."""
+        across = abs(self.end[0] - self.start[0]) * self.scale
+        down = abs(self.end[1] - self.start[1]) * self.scale
+        return across, down, math.hypot(across, down)
+
+    def text(self):
+        across, down, diagonal = self.spans()
+        if down <= self.AXIS_TOLERANCE:
+            return "%d px" % round(across)
+        if across <= self.AXIS_TOLERANCE:
+            return "%d px" % round(down)
+        return "%d × %d · %d px" % (round(across), round(down), round(diagonal))
+
+    def draw(self, cr):
+        (x0, y0), (x1, y1) = self.start, self.end
+        if (x0, y0) == (x1, y1):
+            return
+        angle = math.atan2(y1 - y0, x1 - x0)
+        across = math.cos(angle + math.pi / 2) * self.TICK
+        down = math.sin(angle + math.pi / 2) * self.TICK
+
+        cr.save()
+        painting.use(cr, self.colour)
+        cr.set_line_width(self.LINE_WIDTH)
+        cr.set_line_cap(cairo.LINE_CAP_BUTT)
+        cr.move_to(x0, y0)
+        cr.line_to(x1, y1)
+        for x, y in (self.start, self.end):  # a tick across each end
+            cr.move_to(x - across, y - down)
+            cr.line_to(x + across, y + down)
+        cr.stroke()
+        cr.restore()
+
+        text = self.text()
+        box = painting.label_box(cr, text, (x0 + x1) / 2, (y0 + y1) / 2, centred=True)
+        painting.draw_label(cr, text, box)
+
+    def bounds(self):
+        (x0, y0), (x1, y1) = self.start, self.end
+        pad = 40  # the ticks, and the readout sitting over the middle
+        return Rect(
+            min(x0, x1) - pad,
+            min(y0, y1) - pad,
+            abs(x1 - x0) + pad * 2,
+            abs(y1 - y0) + pad * 2,
+        )
+
+
 class Highlight(Item):
     """A marker stroke: a wash of colour that tints without hiding.
 
