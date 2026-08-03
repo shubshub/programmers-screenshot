@@ -240,22 +240,30 @@ def main():
     # Comparing the two regions to each other instead depended on what the
     # screenshot behind them happened to be, and flipped when the pointer moved
     # to a monitor with darker content under the new region.
+    # Exact comparisons, not brightness ratios: revealing shows the screenshot
+    # itself, and dimming is a fixed alpha over it. A ratio is unstable
+    # wherever the screen behind happens to be nearly black.
+    def same(a, b, tolerance=2):
+        return all(abs(one - two) <= tolerance for one, two in zip(a, b))
+
     h = overlay()
     x, y = h.canvas_point()
     in_new, in_old = (x + 1100, y + 70), (x + 100, y + 70)
-    dimmed = render_overlay(h)
-    dim_new, dim_old = dimmed(*in_new), dimmed(*in_old)
+    dim_old = render_overlay(h)(*in_old)      # nothing marked out: all dim
 
     h.drag(x, y, 200, 150)                    # commit a region round in_old
     h.press(x + 900, y)                       # start a second round in_new
     h.move(x + 1300, y + 150)
     read = render_overlay(h)
-    check("the pending region is revealed",
-          sum(read(*in_new)) > sum(dim_new) + 30,
-          "%s vs %s dimmed" % (read(*in_new), dim_new))
-    check("the committed one goes back to dimmed",
-          all(abs(a - b) <= 2 for a, b in zip(read(*in_old), dim_old)),
+    check("the pending region shows the screenshot, undimmed",
+          same(read(*in_new), pixel(pixbuf, int(in_new[0]), int(in_new[1]))),
+          "%s vs %s in the capture"
+          % (read(*in_new), pixel(pixbuf, int(in_new[0]), int(in_new[1]))))
+    check("the old one is gone, not merely hidden",
+          same(read(*in_old), dim_old),
           "%s vs %s dimmed" % (read(*in_old), dim_old))
+    check("and it really is off the scene", h.overlay.scene.region is None,
+          h.overlay.scene.region)
 
     # ----------------------------------------------------------------- bake
     check.section("annotations are baked into the captured image")
