@@ -51,14 +51,15 @@ def save(values):
         json.dump(values, handle, indent=2, sort_keys=True)
 
 
-def build(values, parent=None):
+def build(values):
     """Assemble the window. Returns (dialog, toggle, chooser).
 
     Split from edit() only so the greying-out can be checked without a person
     to click Close.
     """
-    dialog = Gtk.Dialog(title="Settings", transient_for=parent, modal=True)
-    dialog.set_keep_above(True)  # the overlay it opens over is keep-above too
+    # No transient parent: the only caller hides its own window first, because
+    # that window is override-redirect and would otherwise bury this one.
+    dialog = Gtk.Dialog(title="Settings", modal=True)
     dialog.add_button("Close", Gtk.ResponseType.CLOSE)
 
     toggle = Gtk.CheckButton(label="Save screenshots to a folder")
@@ -87,14 +88,15 @@ def build(values, parent=None):
     return dialog, toggle, chooser
 
 
-def edit(parent=None):
+def edit():
     """Show the settings window, write what it says, and return it.
 
-    Blocks until the window is closed. The caller is responsible for letting
-    go of any pointer grab first — see Overlay._edit_preferences.
+    Blocks until the window is closed. The caller is responsible for dropping
+    any pointer grab and hiding its own window first — see
+    Overlay._edit_preferences for why both matter.
     """
     values = load()
-    dialog, toggle, chooser = build(values, parent)
+    dialog, toggle, chooser = build(values)
 
     dialog.show_all()
     dialog.run()

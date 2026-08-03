@@ -13,6 +13,7 @@ import os
 import shutil
 import sys
 import tempfile
+import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, os.pardir)
@@ -21,10 +22,15 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 import gi  # noqa: E402
 
 gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
 
-from gi.repository import Gtk  # noqa: E402
+from gi.repository import Gdk, Gtk  # noqa: E402
 
-from programmers_screenshot import cli, preferences  # noqa: E402
+sys.path.insert(0, HERE)
+
+from support import Harness  # noqa: E402
+
+from programmers_screenshot import capture, cli, preferences  # noqa: E402
 
 
 class Checker:
@@ -130,6 +136,52 @@ def main():
         else:
             check("no display, so the window was not built", False,
                   "cannot verify the dialog here")
+
+        check.section("the overlay gets out of the way before the window opens")
+        # The overlay is override-redirect on X11: it bypasses the window
+        # manager and sits above everything, so a dialog opened over it maps
+        # for a frame and is then buried, with the program stuck in the
+        # dialog's event loop and no reachable way to close it. It also holds
+        # a pointer and keyboard grab. Both have to be released first, and the
+        # order matters -- releasing them after the dialog opens is too late.
+        harness = Harness(*capture.capture_screen(Gdk.Display.get_default()))
+        order = []
+
+        harness.overlay.window = types.SimpleNamespace(
+            queue_draw=lambda: None,
+            queue_draw_area=lambda *a: None,
+            hide=lambda: order.append("hide overlay"),
+            show=lambda: order.append("show overlay"),
+            get_display=lambda: types.SimpleNamespace(
+                get_default_seat=lambda: types.SimpleNamespace(
+                    ungrab=lambda: order.append("ungrab"))),
+        )
+
+        real_edit = preferences.edit
+        preferences.edit = lambda: order.append("open window") or {}
+        try:
+            harness.overlay._edit_preferences()
+        finally:
+            preferences.edit = real_edit
+
+        def before(first, second):
+            """True only if both happened, in this order. A missing step is a
+            failure to report, not an exception to crash on."""
+            return (first in order and second in order
+                    and order.index(first) < order.index(second))
+
+        check("the grab is dropped", "ungrab" in order, order)
+        check("the overlay hides at all", "hide overlay" in order, order)
+        check("the overlay hides before the window opens",
+              before("hide overlay", "open window"), order)
+        check("the grab is dropped before the window opens",
+              before("ungrab", "open window"), order)
+        check("and the overlay comes back after",
+              before("open window", "show overlay"), order)
+
+        # Showing the window again fires map-event, which retakes the grab --
+        # so nothing here should be trying to grab it a second time by hand.
+        check("it does not re-grab by hand", order.count("ungrab") == 1, order)
 
         check.section("switched off plus --no-clipboard is caught as usage")
         # Both outputs disabled means the capture would go nowhere. The guard

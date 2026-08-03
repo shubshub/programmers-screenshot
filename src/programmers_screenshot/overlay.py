@@ -255,21 +255,27 @@ class Overlay:
             self.window.queue_draw()
 
     def _edit_preferences(self):
-        """Open the settings window, having first let go of the input grab.
+        """Open the settings window, getting out of its way first.
 
-        The overlay owns the pointer and the keyboard. A dialog opened
-        underneath that grab receives no events at all and simply looks
-        frozen, so the grab is handed back for as long as the window is up
-        and taken again afterwards.
+        Two things stop a dialog working over this overlay. It holds a grab on
+        the pointer and the keyboard, so a window opened underneath it gets no
+        events. And on X11 the overlay is override-redirect: it bypasses the
+        window manager and sits above everything, so a dialog opened over it
+        maps for a frame and is then buried, leaving the program apparently
+        frozen in the dialog's own event loop with no reachable way out.
+
+        Neither is worth fighting. Drop the grab, hide the overlay for as long
+        as the window is up, and put it back afterwards. The screen underneath
+        is a still image either way, so there is nothing to see meanwhile.
+        Showing the window again re-runs map-event, which retakes the grab.
         """
-        seat = self.window.get_display().get_default_seat()
-        seat.ungrab()
+        self.window.get_display().get_default_seat().ungrab()
+        self.window.hide()
         try:
-            preferences.edit(self.window)
+            preferences.edit()
         finally:
-            self._grab_attempts = 0
-            self._take_grab()
-        # Hover was not tracked while the dialog had the pointer.
+            self.window.show()
+        # The pointer was elsewhere the whole time, so any hover is stale.
         self.toolbars.set_hover(-1, -1)
         self.window.queue_draw()
 
