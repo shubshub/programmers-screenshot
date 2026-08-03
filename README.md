@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.13.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.14.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.13.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.14.0_all.deb
 ```
 
 ## Bind it to a key
@@ -80,6 +80,7 @@ screen.
 | --- | --- | --- |
 | Region | Drag to set what gets captured; a new drag replaces it, a click clears it | — |
 | Pen | Draw freehand on the frozen screen | Colour, thickness |
+| Highlighter | A translucent wash that tints without hiding | Ink, thickness |
 | Line | Straight lines, rectangles, outlined circles and arrows | Shape, colour, thickness |
 | Redact | Drag a bar that covers something completely | Fill (black or white) |
 | Pixelate | Drag to break an area into coarse blocks | Block size |
@@ -184,6 +185,7 @@ src/programmers_screenshot/
         items.py                  Item, and the shapes that get drawn
         rectangle.py              the region tool
         pen.py                    freehand drawing
+        highlight.py              a translucent marker wash
         line.py                   lines, rectangles, circles and arrows
         redact.py                 solid bars that cover things up
         pixelate.py               coarse blocks over an area
@@ -289,6 +291,7 @@ to a core module to pass, the framework has stopped doing its job.
 ```bash
 python3 tests/test_framework.py       # scene, settings, tools, adding a tool
 python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
+python3 tests/test_highlighter.py     # the wash, on light and dark
 python3 tests/test_line_tool.py       # lines, circles, arrows and Shift
 python3 tests/test_pixelate_tool.py   # blocks, and where they come from
 python3 tests/test_redact_tool.py     # the bar is opaque, nothing survives
