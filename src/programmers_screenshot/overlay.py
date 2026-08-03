@@ -191,6 +191,10 @@ class Overlay:
         return self.scene.region or Rect(0, 0, self.bounds.width, self.bounds.height)
 
     def _capture_now(self):
+        # Anything half-finished has to join the scene first: render() draws
+        # the scene and nothing else, so uncommitted work would be missing
+        # from the image.
+        self.scene.do(self.active_tool.commit())
         self._finish(self.render())
 
     def render(self):
@@ -221,6 +225,7 @@ class Overlay:
     def _choose_tool(self, tool):
         if tool is self.active_tool:
             return
+        self.scene.do(self.active_tool.commit())
         self.active_tool.cancel()
         self.active_tool = tool
         self.toolbar.show_settings_for(tool)
@@ -235,6 +240,7 @@ class Overlay:
             self._finish(None)
         elif button.kind == toolbar_module.SETTING:
             self.values.set(button.setting, button.value)
+            self.active_tool.settings_changed(self.values)
             self.window.queue_draw()
 
     # -- input -------------------------------------------------------------
@@ -251,6 +257,8 @@ class Overlay:
             return True
 
         self._pressed_button = None
+        # Clicking away is how a tool with lingering state is told it is done.
+        self.scene.do(self.active_tool.commit())
         was_idle = self._idle()
         self._dragging = True
         self._last_damage = None
@@ -322,6 +330,12 @@ class Overlay:
         key = Gdk.keyval_name(event.keyval)
         control = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
         shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
+
+        # The active tool gets first refusal. Typing needs Enter and Escape,
+        # which would otherwise capture and close.
+        if self.active_tool.key_press(key, event.string, control, shift):
+            self._redraw_gesture()
+            return True
 
         if control and key in ("z", "Z"):
             changed = self.scene.redo() if shift else self.scene.undo()
@@ -411,6 +425,7 @@ class Overlay:
             not self._dragging
             and self.scene.region is None
             and not self.scene.items
+            and self.active_tool.bounds() is None
         )
 
     def _draw_guides(self, cr):

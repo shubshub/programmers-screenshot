@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.7.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.8.1_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.7.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.8.1_all.deb
 ```
 
 ## Bind it to a key
@@ -82,6 +82,7 @@ screen.
 | Pen | Draw freehand on the frozen screen | Colour, thickness |
 | Line | Straight lines, outlined circles and arrows | Shape, colour, thickness |
 | Step | Click to drop numbered badges: 1, 2, 3… | Size, colour |
+| Text | Click, type, click away. Enter makes a new line | Size, backing, colour |
 
 Tools that have settings get a second toolbar row underneath the first, holding
 just their own options. Setting values are shared by key, so the colour and
@@ -169,6 +170,7 @@ src/programmers_screenshot/
         pen.py                    freehand drawing
         line.py                   lines, circles and arrows
         step.py                   numbered step badges
+        text.py                   typing, with an optional white backing
         __init__.py               ALL_TOOLS — the registry
     output.py                     saving and clipboard
     notifications.py              the notification and its buttons
@@ -251,6 +253,13 @@ Two things to get right in a new shape: `Item.bounds()` must cover everything
 `constrain()` decides what <kbd>Shift</kbd> does, with `square_corner()` and
 `snap_to_45()` in `geometry.py` covering the usual cases.
 
+A tool whose state outlives one gesture — text being typed — implements two
+more. `key_press()` gets first refusal on the keyboard, which is how Enter
+means a newline rather than Capture. `commit()` hands the finished work over,
+and the overlay calls it before capturing, before switching tools and before
+the next gesture begins, so nothing half-finished is lost. `text.py` is the
+worked example.
+
 This is enforced, not just documented: `tests/test_framework.py` defines a tool
 inside the test file and drives it end to end. If that test ever needs a change
 to a core module to pass, the framework has stopped doing its job.
@@ -262,6 +271,7 @@ python3 tests/test_framework.py       # scene, settings, tools, adding a tool
 python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
 python3 tests/test_line_tool.py       # lines, circles, arrows and Shift
 python3 tests/test_step_tool.py       # numbered badges and undo renumbering
+python3 tests/test_text_tool.py       # typing, committing, and the backing
 python3 tests/test_redraw.py          # partial redraws leave no stale pixels
 python3 tests/test_notifications.py   # notification wiring and agent handoff
 python3 tests/test_sound.py           # the sound asset, generator and playback
