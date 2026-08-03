@@ -236,16 +236,26 @@ def main():
     check("and after releasing", is_green(read, x + 150, y), read(x + 150, y))
 
     check.section("only one region is undimmed at a time")
+    # Each point is judged against how it looks with nothing marked out at all.
+    # Comparing the two regions to each other instead depended on what the
+    # screenshot behind them happened to be, and flipped when the pointer moved
+    # to a monitor with darker content under the new region.
     h = overlay()
     x, y = h.canvas_point()
-    h.drag(x, y, 200, 150)                    # commit a region
-    h.press(x + 900, y)                       # start a second, elsewhere
+    in_new, in_old = (x + 1100, y + 70), (x + 100, y + 70)
+    dimmed = render_overlay(h)
+    dim_new, dim_old = dimmed(*in_new), dimmed(*in_old)
+
+    h.drag(x, y, 200, 150)                    # commit a region round in_old
+    h.press(x + 900, y)                       # start a second round in_new
     h.move(x + 1300, y + 150)
     read = render_overlay(h)
-    inside_new = sum(read(x + 1100, y + 70))
-    inside_old = sum(read(x + 100, y + 70))
-    check("the new one is revealed", inside_new > inside_old,
-          "new %d vs old %d" % (inside_new, inside_old))
+    check("the pending region is revealed",
+          sum(read(*in_new)) > sum(dim_new) + 30,
+          "%s vs %s dimmed" % (read(*in_new), dim_new))
+    check("the committed one goes back to dimmed",
+          all(abs(a - b) <= 2 for a, b in zip(read(*in_old), dim_old)),
+          "%s vs %s dimmed" % (read(*in_old), dim_old))
 
     # ----------------------------------------------------------------- bake
     check.section("annotations are baked into the captured image")
