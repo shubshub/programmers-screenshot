@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.16.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.17.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.16.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.17.0_all.deb
 ```
 
 ## Bind it to a key
@@ -36,21 +36,24 @@ sudo apt install ./dist/programmers-screenshot_0.16.0_all.deb
 programmers-screenshot --install-hotkey
 ```
 
-This registers a GNOME custom shortcut on <kbd>Shift</kbd>+<kbd>Super</kbd>+<kbd>S</kbd>
-("Super" being the Windows key). Pass a different
-[GTK accelerator](https://docs.gtk.org/gtk3/func.accelerator_parse.html) to
-choose your own, and `--uninstall-hotkey` to remove it:
+This registers a GNOME custom shortcut on <kbd>Print</kbd>.
+
+GNOME holds that key for its own screenshot UI, and a custom shortcut does not
+reliably win while it does — so installing **switches the built-in off** and
+says so. It writes down what it took, and `--uninstall-hotkey` gives it back:
 
 ```bash
-programmers-screenshot --install-hotkey '<Ctrl><Shift>Print'
-programmers-screenshot --uninstall-hotkey
+programmers-screenshot --install-hotkey                    # Print
+programmers-screenshot --install-hotkey '<Shift><Super>s'  # or your own
+programmers-screenshot --uninstall-hotkey                  # and put GNOME's back
 ```
 
-Prefer to do it yourself? Settings → Keyboard → View and Customize Shortcuts →
-Custom Shortcuts, with `programmers-screenshot` as the command.
+Any [GTK accelerator](https://docs.gtk.org/gtk3/func.accelerator_parse.html)
+works. An accelerator nobody holds disturbs nothing.
 
-Note that GNOME already owns `Print` (screenshot UI), `<Shift>Print` (full
-screen) and `<Alt>Print` (window), so pick something else or rebind those first.
+Prefer to do it yourself? Settings → Keyboard → View and Customize Shortcuts →
+Custom Shortcuts, with `programmers-screenshot` as the command — but you will
+have to clear GNOME's `Print` binding yourself first.
 
 ## Using it
 
