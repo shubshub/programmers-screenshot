@@ -212,6 +212,22 @@ def main():
         wrong = screen.differences_from_full_repaint()
         check("%s matches a full repaint" % shape, not wrong, describe(wrong))
 
+    check.section("dragging out a redaction bar leaves nothing behind")
+    h = Harness(pixbuf, bounds)
+    screen = Screen(h, bounds)
+    screen.prime()
+    h.use_tool("redact")
+    h.press(x, y)
+    screen.flush()
+    for step in range(1, 18):
+        h.move(x + step * 36, y + step * 14)
+        screen.flush()
+    for step in range(17, 6, -1):  # and shrinking it back
+        h.move(x + step * 36, y + step * 14)
+        screen.flush()
+    wrong = screen.differences_from_full_repaint()
+    check("matches a full repaint", not wrong, describe(wrong))
+
     check.section("dragging a step badge into place leaves nothing behind")
     from programmers_screenshot.tools.step import SIZE  # noqa: E402
 
