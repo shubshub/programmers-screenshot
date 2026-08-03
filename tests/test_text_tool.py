@@ -229,16 +229,23 @@ def main():
     check("captured", h.finished and h.result is not None)
     check("the text became an item", len(texts(h)) == 1, texts(h))
 
-    # Against the same region captured with nothing typed, so this does not
-    # depend on what the screenshot behind it happens to look like.
-    empty = typing(size=28, background=True)
-    empty.overlay.scene.do(SetRegion(Rect(x - 10, y - 10, 400, 120)))
-    empty.click_button("capture")
-    changed = sum(
-        1 for px in range(20, 380, 4) for py in range(20, 100, 4)
-        if pixel(h.result, px, py) != pixel(empty.result, px, py)
-    )
-    check("the text and its backing reached the image", changed > 200, changed)
+    # Inside the backing box specifically. Counting pixels that merely differ
+    # from an un-typed capture depended on how much the white box stood out
+    # from whatever was behind it, and hovered either side of its threshold.
+    block = [i for i in h.items if isinstance(i, TextBlock)][0]
+    box = block.box()
+    inside = [
+        (10 + 3 + dx, 10 + 3 + dy)
+        for dx in range(0, int(box.width) - 6, 5)
+        for dy in range(0, int(box.height) - 6, 5)
+    ]
+    white = [p for p in inside if is_white(pixel(h.result, *p))]
+    check("its white backing reached the image",
+          len(white) > len(inside) * 0.5,
+          "%d of %d sampled points are white" % (len(white), len(inside)))
+    check("and the glyphs are on top of it",
+          len(white) < len(inside),
+          "%d of %d are not white" % (len(inside) - len(white), len(inside)))
 
     check.section("the backing covers the longest line and the whole paragraph")
     for lines in (("short", "a much longer line here"), ("a much longer line here", "short")):
