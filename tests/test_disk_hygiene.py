@@ -156,6 +156,71 @@ def main():
               mode_of(witness) == 0o644, oct(mode_of(witness)))
 
         # ------------------------------------------------------------------
+        check.section("it is never linked into place at a readable mode")
+        # Tightening after saving is not enough: the complete image sits under
+        # the final name at the umask's mode until the chmod lands, and a
+        # reader who opens it in that window keeps reading through the fd.
+        # So the destination name must only ever appear via the rename, and
+        # what gets renamed must already be private.
+        seen = {}
+        real_replace = os.replace
+
+        def watch_replace(source, destination):
+            seen["source mode"] = mode_of(source)
+            seen["destination existed"] = os.path.exists(destination)
+            return real_replace(source, destination)
+
+        output.os.replace = watch_replace
+        try:
+            target = os.path.join(workspace, "renamed.png")
+            output.save(a_pixbuf(), output=target)
+        finally:
+            output.os.replace = real_replace
+
+        check("the save went through a rename", "source mode" in seen, seen)
+        check("what was renamed in was already 0600",
+              seen.get("source mode") == 0o600, oct(seen.get("source mode", 0)))
+        check("the final name never existed before the rename",
+              seen.get("destination existed") is False, seen)
+
+        check.section("overwriting does not inherit the old file's mode")
+        victim = os.path.join(workspace, "victim.png")
+        os.close(os.open(victim, os.O_CREAT | os.O_WRONLY, 0o666))
+        check("it starts world-readable", mode_of(victim) == 0o644,
+              oct(mode_of(victim)))
+        output.save(a_pixbuf(), output=victim)
+        check("and ends 0600", mode_of(victim) == 0o600, oct(mode_of(victim)))
+
+        check.section("a symlink at the destination is replaced, not followed")
+        # Screenshot names are timestamps, so they are guessable. Saving into
+        # a world-writable directory used to mean anyone could pre-plant a
+        # symlink under the name we were about to use and have the PNG written
+        # straight through it, over a file of theirs choosing that we own.
+        planted = os.path.join(workspace, "planted.png")
+        precious = os.path.join(workspace, "precious.txt")
+        with open(precious, "wb") as handle:
+            handle.write(b"PRECIOUS CONTENTS\n")
+        os.symlink(precious, planted)
+
+        output.save(a_pixbuf(), output=planted)
+        with open(precious, "rb") as handle:
+            after = handle.read()
+        check("the file it pointed at is untouched",
+              after == b"PRECIOUS CONTENTS\n", after[:16])
+        check("the symlink itself was replaced", not os.path.islink(planted))
+        check("and the screenshot landed on the link's own name",
+              open(planted, "rb").read(4) == b"\x89PNG")
+        check("still 0600 through that route", mode_of(planted) == 0o600,
+              oct(mode_of(planted)))
+
+        check.section("no working files are left in the destination")
+        strays = [
+            name for name in os.listdir(workspace)
+            if name.startswith(".") and name.endswith(".png")
+        ]
+        check("nothing half-written left behind", not strays, strays)
+
+        # ------------------------------------------------------------------
         check.section("the Wayland capture cleans up after the shell")
 
         shell = FakeShell()
