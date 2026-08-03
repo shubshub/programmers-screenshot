@@ -16,12 +16,21 @@ from .base import DragTool, ShapeTool, Tool
 from .items import Arrow, Box, Ellipse, Item, Line, Redaction, Shape, Stroke
 from .line import LineTool
 from .pen import PenTool
+from .pixelate import PixelateTool
 from .rectangle import RectangleTool
 from .redact import RedactTool
 from .step import StepTool
 from .text import TextTool
 
-ALL_TOOLS = (RectangleTool, PenTool, LineTool, RedactTool, StepTool, TextTool)
+ALL_TOOLS = (
+    RectangleTool,
+    PenTool,
+    LineTool,
+    RedactTool,
+    PixelateTool,
+    StepTool,
+    TextTool,
+)
 
 __all__ = [
     "ALL_TOOLS",
