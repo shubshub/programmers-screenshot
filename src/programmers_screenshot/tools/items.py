@@ -113,6 +113,23 @@ class Line(Shape):
         cr.restore()
 
 
+class Redaction(Shape):
+    """A solid fill.
+
+    It replaces the pixels underneath rather than obscuring them, so nothing
+    about the original survives into the captured PNG. That is the whole
+    point: pixelation only averages the pixels, and the averages leak.
+    """
+
+    def draw(self, cr):
+        rect = Rect.from_points(self.start, self.end)
+        if not rect:
+            return
+        painting.use(cr, self.colour)
+        cr.rectangle(rect.x, rect.y, rect.width, rect.height)
+        cr.fill()
+
+
 class Box(Shape):
     """A rectangle outline round the drag. Stroke only, like the ellipse."""
 
