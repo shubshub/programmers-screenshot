@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.15.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.16.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.15.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.16.0_all.deb
 ```
 
 ## Bind it to a key
@@ -83,6 +83,7 @@ screen.
 | Highlighter | A translucent wash that tints without hiding | Ink, thickness |
 | Line | Straight lines, rectangles, outlined circles and arrows | Shape, colour, thickness |
 | Measure | Drag to read a distance in pixels | Colour |
+| Colour picker | Click a pixel; its colour goes on the clipboard | Format (#hex or rgb()) |
 | Redact | Drag a bar that covers something completely | Fill (black or white) |
 | Pixelate | Drag to break an area into coarse blocks | Block size |
 | Step | Click to drop numbered badges: 1, 2, 3… | Size, colour |
@@ -100,6 +101,11 @@ line tool's shape icons, which carry no text of their own.
 Tools that have settings get a second toolbar row underneath the first, holding
 just their own options. Setting values are shared by key, so the colour and
 thickness you pick for the pen are the ones the line tool uses too.
+
+The colour picker is the one tool that leaves nothing behind: it copies and
+shows you what it copied, but adds nothing to the scene and nothing to the
+capture. Note that capturing puts the *image* on the clipboard, replacing the
+colour — so pick, then press <kbd>Esc</kbd>, if the colour is what you came for.
 
 Hold <kbd>Shift</kbd> while dragging to constrain: the region and the circle go
 square, the rectangle too, and lines and arrows snap to 45° angles.
@@ -189,6 +195,7 @@ src/programmers_screenshot/
         highlight.py              a translucent marker wash
         line.py                   lines, rectangles, circles and arrows
         measure.py                a ruler, in physical pixels
+        picker.py                 the eyedropper
         redact.py                 solid bars that cover things up
         pixelate.py               coarse blocks over an area
         step.py                   numbered step badges
@@ -296,6 +303,7 @@ python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
 python3 tests/test_highlighter.py     # the wash, on light and dark
 python3 tests/test_line_tool.py       # lines, circles, arrows and Shift
 python3 tests/test_measure_tool.py    # distances, in physical pixels
+python3 tests/test_picker.py          # reading a pixel, copying the value
 python3 tests/test_pixelate_tool.py   # blocks, and where they come from
 python3 tests/test_redact_tool.py     # the bar is opaque, nothing survives
 python3 tests/test_step_tool.py       # numbered badges and undo renumbering

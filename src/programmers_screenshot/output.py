@@ -54,11 +54,39 @@ def copy_to_clipboard(pixbuf):
     return _copy_via_gtk(pixbuf)
 
 
-def _clipboard_helper():
+def copy_text(text):
+    """Put a short string on the clipboard, the same way an image goes there.
+
+    Note this is the same clipboard the capture uses, so taking a screenshot
+    afterwards replaces whatever was copied.
+    """
+    helper = _clipboard_helper(image=False)
+    if helper:
+        try:
+            process = subprocess.Popen(
+                helper,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            process.stdin.write(text.encode("utf-8"))
+            process.stdin.close()
+            return True
+        except OSError:
+            pass
+
+    clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+    clipboard.set_text(text, -1)
+    clipboard.store()
+    return True
+
+
+def _clipboard_helper(image=True):
+    kind = "image/png" if image else "text/plain"
     if not is_x11(Gdk.Display.get_default()) and shutil.which("wl-copy"):
-        return ["wl-copy", "--type", "image/png"]
+        return ["wl-copy", "--type", kind]
     if shutil.which("xclip"):
-        return ["xclip", "-selection", "clipboard", "-target", "image/png"]
+        return ["xclip", "-selection", "clipboard", "-target", kind]
     return None
 
 
