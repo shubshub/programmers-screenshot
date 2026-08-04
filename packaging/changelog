@@ -1,3 +1,15 @@
+programmers-screenshot (0.18.2) noble; urgency=medium
+
+  * Fix: on a HiDPI display the overlay showed a hugely magnified crop of the
+    top-left corner instead of the desktop. The capture arrives in physical
+    pixels and the overlay draws in logical ones, and the on-screen paint did
+    not account for the difference. The undimmed selection region had the
+    same fault. Saved PNGs were never affected -- they were always rendered
+    with the correct arithmetic -- but the overlay was unusable, since you
+    could not see what you were selecting.
+
+ -- Shubshub  Mon, 03 Aug 2026 20:15:00 +1200
+
 programmers-screenshot (0.18.1) noble; urgency=medium
 
   * Fix: a setting changed in the settings window did not affect the capture

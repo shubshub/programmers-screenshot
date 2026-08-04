@@ -104,13 +104,35 @@ def region_damage(rect):
     )
 
 
+def draw_frozen_screen(cr, canvas):
+    """Paint the captured screen across the overlay, at the right size.
+
+    The capture is in physical pixels and the overlay draws in logical ones,
+    so on a HiDPI display the two differ by canvas.scale. Painting it
+    untransformed showed a magnified crop of the top-left corner instead of
+    the desktop.
+
+    Only for drawing to the screen. Overlay.render() has its own arithmetic,
+    because there the annotations are what have to be scaled up, not the
+    screen scaled down.
+    """
+    cr.save()
+    if canvas.scale != 1:
+        cr.scale(1.0 / canvas.scale, 1.0 / canvas.scale)
+    cr.set_source_surface(canvas.surface, 0, 0)
+    cr.paint()
+    cr.restore()
+
+
 def reveal(cr, canvas, rect):
     """Undim the region by repainting the frozen screen inside it."""
     cr.save()
+    # Clip first, in logical coordinates, then let the paint do its own
+    # scaling -- the rectangle is where the pointer went, not where the
+    # captured pixels are.
     cr.rectangle(rect.x, rect.y, rect.width, rect.height)
     cr.clip()
-    cr.set_source_surface(canvas.surface, 0, 0)
-    cr.paint()
+    draw_frozen_screen(cr, canvas)
     cr.restore()
 
 
