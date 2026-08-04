@@ -6,7 +6,7 @@ being one new file.
 """
 
 from .. import painting, theme
-from ..actions import Action
+from ..actions import Action, RemoveItem
 from ..geometry import Rect
 from ..settings import COLOUR, ChoiceSetting
 from .base import DragTool
@@ -61,7 +61,7 @@ class Step(Item):
         self.radius = radius
         self.number = 0  # assigned when it joins the scene, see AddStep
 
-    def draw(self, cr):
+    def paint(self, cr):
         x, y = self.centre
         ink = contrasting(self.colour)
         painting.circle(cr, x, y, self.radius, self.colour)
@@ -89,8 +89,18 @@ class Step(Item):
         return Rect(x - reach, y - reach, reach * 2, reach * 2)
 
 
+def steps(scene):
+    return [item for item in scene.items if isinstance(item, Step)]
+
+
 def next_number(scene):
-    return sum(1 for item in scene.items if isinstance(item, Step)) + 1
+    """The number the next badge gets.
+
+    Counting what is there only works while the numbers run 1..n, which is
+    why erasing one closes the gap behind it rather than leaving one --
+    otherwise this hands out a number that is already in use.
+    """
+    return len(steps(scene)) + 1
 
 
 class AddStep(Action):
@@ -110,6 +120,30 @@ class AddStep(Action):
 
     def revert(self, scene):
         scene.items.remove(self.item)
+
+
+class RemoveStep(RemoveItem):
+    """Erase a badge and close the gap behind it.
+
+    Everything after it counts down one, so the sequence stays 1..n and
+    next_number() keeps working. The old numbers are not stored: contiguity
+    makes them derivable on the way back.
+
+    One action, not two. Split the removal from the renumbering and undo can
+    hand back the badge without its neighbours' numbers.
+    """
+
+    def apply(self, scene):
+        super().apply(scene)
+        for step in steps(scene):
+            if step.number > self.item.number:
+                step.number -= 1
+
+    def revert(self, scene):
+        for step in steps(scene):
+            if step.number >= self.item.number:
+                step.number += 1
+        super().revert(scene)
 
 
 class StepTool(DragTool):

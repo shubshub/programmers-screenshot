@@ -1,3 +1,23 @@
+programmers-screenshot (0.19.0) noble; urgency=medium
+
+  * New Eraser tool: drag across the canvas to rub out the parts of any mark
+    you sweep through -- half a pen stroke, a bite out of a rectangle, a hole
+    in a pixelate block or a redaction bar. A plain click with no drag
+    removes the whole mark instead.
+  * The holes are kept as geometry rather than as a bitmap mask, so they are
+    as sharp in the saved PNG as they are on screen, whatever the display
+    scale.
+  * The rubbing out happens under the pointer as you drag, not when you let
+    go.
+  * One drag undoes as a single step, however many marks it crossed.
+  * Note that rubbing out part of a redaction bar uncovers what it was
+    hiding.
+  * Erasing a numbered step badge renumbers the ones after it, so the
+    sequence stays 1..n and the next badge continues instead of repeating a
+    number already in use.
+
+ -- Shubshub  Tue, 04 Aug 2026 10:30:00 +1200
+
 programmers-screenshot (0.18.2) noble; urgency=medium
 
   * Fix: on a HiDPI display the overlay showed a hugely magnified crop of the

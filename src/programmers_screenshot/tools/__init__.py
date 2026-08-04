@@ -25,6 +25,7 @@ from .items import (
     Shape,
     Stroke,
 )
+from .eraser import EraserTool
 from .highlight import HighlighterTool
 from .line import LineTool
 from .measure import MeasureTool
@@ -47,6 +48,7 @@ ALL_TOOLS = (
     PickerTool,
     StepTool,
     TextTool,
+    EraserTool,
 )
 
 __all__ = [
@@ -54,6 +56,7 @@ __all__ = [
     "Arrow",
     "Box",
     "DragTool",
+    "EraserTool",
     "Ellipse",
     "Highlight",
     "Item",

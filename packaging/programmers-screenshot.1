@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.18.2" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.19.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -131,6 +131,20 @@ for one is the colour the next one uses.
 Hovering any button on either row names it, which is the only place the
 colour swatches and the line tool's shape icons are labelled.
 .SH INTERFACE
+.TP
+.B Eraser
+Drag across the canvas to rub out the parts of any mark you sweep through:
+half a pen stroke, a bite out of a rectangle, a hole in a pixelate block. A
+plain click with no drag removes the whole mark instead. Marks open up under
+the pointer as you drag rather than when you release. The holes are kept
+as geometry rather than as a bitmap, so they come out as sharp in the saved
+PNG as they look on screen. One drag undoes as one step however many marks it
+touched. Clicking a numbered step closes the gap, so the badges after it count
+down and the next one you place carries on the sequence.
+.IP
+Rubbing out part of a redaction bar uncovers what was under it. That is what
+you asked for, but it is worth knowing before you do it to something you were
+hiding on purpose.
 .TP
 .B Capture
 Top right. Always available.

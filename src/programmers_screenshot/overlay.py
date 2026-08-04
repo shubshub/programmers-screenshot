@@ -15,7 +15,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 from . import capture, painting, preferences, theme, toolbar as toolbar_module
-from .geometry import Rect, union
+from .geometry import Rect, circle_touches, union
 from .actions import SetRegion
 from .scene import Scene
 from .settings import SettingValues
@@ -25,6 +25,15 @@ HINT = "Drag to mark a region  ·  Enter or Capture takes it  ·  Esc to cancel"
 GRAB_RETRY_MS = 50
 GRAB_ATTEMPTS = 20
 DAMAGE_MARGIN = 8  # px of slack round a partial redraw
+
+
+def _erased(item, circles):
+    """The mark as the sweep in progress would leave it."""
+    box = item.bounds()
+    if box is None:
+        return item
+    touching = [c for c in circles if circle_touches(box, c)]
+    return item.with_erasure(touching) if touching else item
 
 
 def _shift_held(event):
@@ -453,7 +462,13 @@ class Overlay:
         if region is not None:
             painting.draw_region(cr, canvas, region)
 
+        # An eraser mid-sweep changes marks that are already down, so they are
+        # drawn through what it has rubbed out so far rather than painted
+        # whole and then covered up.
+        erasing = self.active_tool.pending_erasure()
         for item in self.scene.items:
+            if erasing:
+                item = _erased(item, erasing)
             item.draw(cr)
 
         self.active_tool.preview(cr, canvas)

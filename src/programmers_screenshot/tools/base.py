@@ -100,6 +100,16 @@ class Tool:
         """
         return None
 
+    def pending_erasure(self):
+        """Discs this tool is rubbing out right now, before it commits them.
+
+        The overlay draws every mark through these, so an eraser takes effect
+        under the pointer instead of only when the button comes up. Same idea
+        as pending_region(): the gesture has to change what is already on the
+        canvas, which a preview drawn on top cannot do.
+        """
+        return ()
+
     def bounds(self):
         """Where the gesture in progress is, for partial redraws."""
         return None
