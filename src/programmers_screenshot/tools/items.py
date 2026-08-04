@@ -9,6 +9,7 @@ its endpoints. Report it too small and the item smears during a drag, because
 partial redraws trust it.
 """
 
+import copy
 import math
 
 import cairo
@@ -19,10 +20,61 @@ from ..geometry import Rect
 
 
 class Item:
-    """One committed annotation."""
+    """One committed annotation.
+
+    Subclasses implement paint(); everything calls draw(), which is paint()
+    with any erased parts taken back out again.
+    """
+
+    #: Circles the eraser has taken out of this mark, as (x, y, radius) in
+    #: logical coordinates. Geometry rather than a bitmap mask, so the holes
+    #: come out just as sharp in the capture as they look on screen.
+    erased = ()
+
+    def paint(self, cr):
+        """Draw the whole mark, as though nothing had been erased."""
+        raise NotImplementedError
 
     def draw(self, cr):
-        raise NotImplementedError
+        """Draw the mark, minus whatever has been rubbed out of it.
+
+        The holes are punched with CLEAR inside a group rather than by
+        clipping to an inverted path: eraser samples overlap heavily along a
+        drag, and an even-odd clip would flip those overlaps back to solid,
+        leaving spots of the mark behind in the middle of the stroke.
+        """
+        if not self.erased:
+            self.paint(cr)
+            return
+
+        cr.save()
+        box = self.bounds()
+        if box is not None:
+            # Keeps the group to the size of the mark rather than the screen.
+            cr.rectangle(box.x, box.y, box.width, box.height)
+            cr.clip()
+        cr.push_group()
+        self.paint(cr)
+        cr.set_operator(cairo.OPERATOR_CLEAR)
+        for x, y, radius in self.erased:
+            cr.new_path()
+            cr.arc(x, y, radius, 0, 2 * math.pi)
+            cr.fill()
+        cr.set_operator(cairo.OPERATOR_OVER)
+        cr.pop_group_to_source()
+        cr.paint()
+        cr.restore()
+
+    def with_erasure(self, circles):
+        """A copy with more taken out of it.
+
+        A shallow copy, so this one implementation serves every item type
+        whatever its constructor looks like. Only the erased tuple is
+        replaced, and tuples are not shared mutably, so nothing else aliases.
+        """
+        clone = copy.copy(self)
+        clone.erased = tuple(self.erased) + tuple(circles)
+        return clone
 
     def bounds(self):
         """Roughly where this sits, for redrawing only the part that changed.
@@ -40,7 +92,7 @@ class Stroke(Item):
         self.colour = colour
         self.width = width
 
-    def draw(self, cr):
+    def paint(self, cr):
         if not self.points:
             return
         cr.save()
@@ -106,7 +158,7 @@ class Measurement(Item):
             return "%d px" % round(down)
         return "%d × %d · %d px" % (round(across), round(down), round(diagonal))
 
-    def draw(self, cr):
+    def paint(self, cr):
         (x0, y0), (x1, y1) = self.start, self.end
         if (x0, y0) == (x1, y1):
             return
@@ -163,7 +215,7 @@ class Highlight(Item):
         self.colour = colour
         self.width = width
 
-    def draw(self, cr):
+    def paint(self, cr):
         if not self.points:
             return
         cr.save()
@@ -224,7 +276,7 @@ class Shape(Item):
 class Line(Shape):
     """A straight line between the two ends of the drag."""
 
-    def draw(self, cr):
+    def paint(self, cr):
         cr.save()
         self._stroke_style(cr)
         cr.move_to(*self.start)
@@ -241,7 +293,7 @@ class Redaction(Shape):
     point: pixelation only averages the pixels, and the averages leak.
     """
 
-    def draw(self, cr):
+    def paint(self, cr):
         rect = Rect.from_points(self.start, self.end)
         if not rect:
             return
@@ -253,7 +305,7 @@ class Redaction(Shape):
 class Box(Shape):
     """A rectangle outline round the drag. Stroke only, like the ellipse."""
 
-    def draw(self, cr):
+    def paint(self, cr):
         rect = Rect.from_points(self.start, self.end)
         if not rect:
             return
@@ -268,7 +320,7 @@ class Ellipse(Shape):
     """An outline inscribed in the drag box. Stroke only: never hides what is
     behind it, which is the point of ringing something."""
 
-    def draw(self, cr):
+    def paint(self, cr):
         box = Rect.from_points(self.start, self.end)
         if box.width < 1 or box.height < 1:
             return
@@ -298,7 +350,7 @@ class Arrow(Shape):
     def head_length(self):
         return max(self.width * self.HEAD_RATIO, self.HEAD_MINIMUM)
 
-    def draw(self, cr):
+    def paint(self, cr):
         (x0, y0), (x1, y1) = self.start, self.end
         if (x0, y0) == (x1, y1):
             return

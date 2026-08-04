@@ -79,7 +79,7 @@ class TextBlock(Item):
             metrics["height"] + PADDING * 2,
         )
 
-    def draw(self, cr):
+    def paint(self, cr):
         metrics = layout(self.lines, self.size)
         if self.background:
             painting.use(cr, BACKGROUND_COLOUR)

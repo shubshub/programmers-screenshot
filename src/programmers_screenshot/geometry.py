@@ -86,6 +86,18 @@ def snap_to_45(start, end):
     return (x0 + distance * math.cos(angle), y0 + distance * math.sin(angle))
 
 
+def circle_touches(rect, circle):
+    """Whether a disc reaches a rectangle at all.
+
+    Used to skip marks an eraser sweep never came near, rather than making
+    every mark punch every disc.
+    """
+    x, y, radius = circle
+    nearest_x = min(max(x, rect.x), rect.right)
+    nearest_y = min(max(y, rect.y), rect.bottom)
+    return (x - nearest_x) ** 2 + (y - nearest_y) ** 2 <= radius * radius
+
+
 def union(rects):
     """Smallest rectangle covering all of them."""
     rects = list(rects)

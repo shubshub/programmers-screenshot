@@ -53,7 +53,7 @@ class Pixelation(Item):
         self.blocks = blocks  # a small ImageSurface, one pixel per block
         self.block = block
 
-    def draw(self, cr):
+    def paint(self, cr):
         wide = self.blocks.get_width()
         tall = self.blocks.get_height()
         if not wide or not tall:
