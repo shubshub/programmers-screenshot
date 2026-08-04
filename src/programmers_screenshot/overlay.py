@@ -443,8 +443,7 @@ class Overlay:
     def _on_draw(self, widget, cr):
         canvas = self.canvas()
 
-        cr.set_source_surface(self.surface, 0, 0)
-        cr.paint()
+        painting.draw_frozen_screen(cr, canvas)
         painting.use(cr, theme.SCREEN_DIM)
         cr.paint()
 
