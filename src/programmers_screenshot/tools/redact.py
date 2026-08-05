@@ -26,7 +26,8 @@ class RedactTool(ShapeTool):
     """Drag a rectangle and it is filled solid."""
 
     name = "redact"
-    label = "Redact"
+    label = "Black Bar"
+    group = "Redact"
     settings = (FILL,)
 
     def make_item(self, start, end, values):

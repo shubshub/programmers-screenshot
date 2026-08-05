@@ -31,14 +31,20 @@ class Toolbars:
     the same state: pick a tool on one and it lights up on all of them.
     """
 
-    def __init__(self, tools, monitors, values, mode=BAR, origin=None):
+    def __init__(self, tools, monitors, values, mode=BAR, origin=None,
+                 chosen=None):
         self.mode = mode
+        #: group name -> the member last picked from it. Shared by every bar,
+        #: so choosing on one screen shows on the others.
+        self.chosen = {} if chosen is None else chosen
         if mode == PALETTE:
             # One, not one each. You put it where you want it, and copies on
             # the other screens would be clutter you could not get rid of.
-            self.bars = [PaletteToolbar(tools, monitors[0], values, origin)]
+            self.bars = [PaletteToolbar(tools, monitors[0], values, origin,
+                                        self.chosen)]
         else:
-            self.bars = [Toolbar(tools, monitor, values) for monitor in monitors]
+            self.bars = [Toolbar(tools, monitor, values, None, self.chosen)
+                         for monitor in monitors]
 
     @property
     def palette(self):
@@ -52,6 +58,14 @@ class Toolbars:
 
     def move_palette(self, x, y):
         self.palette.move_to(x, y)
+
+    def shown(self, button):
+        """Which tool a button stands for right now."""
+        return self.bars[0].shown(button)
+
+    def choose_member(self, button):
+        """Remember a member as its group's current pick."""
+        self.chosen[button.tool.group] = button.tool
 
     def close_flyouts(self):
         changed = False
@@ -106,18 +120,38 @@ class Toolbars:
 class Button:
     kind: str
     rect: Rect
-    tool: object = None     # TOOL buttons
-    setting: object = None  # SETTING buttons
-    value: object = None    # SETTING buttons
+    tool: object = None      # TOOL and tool-VARIANT buttons
+    setting: object = None   # SETTING and setting-VARIANT buttons
+    value: object = None     # SETTING and setting-VARIANT buttons
+    members: object = None   # TOOL buttons standing for a group of tools
+
+
+def grouped(tools):
+    """Fold neighbouring tools that share a group into one entry each.
+
+    Neighbouring, not gathered from all over: the order of the toolbar is
+    deliberate, and a group assembled from tools at either end of it would
+    move buttons around behind the reader's back.
+    """
+    entries = []
+    for tool in tools:
+        if (tool.group is not None and entries
+                and entries[-1][0].group == tool.group):
+            entries[-1].append(tool)
+        else:
+            entries.append([tool])
+    return entries
 
 
 class Toolbar:
     """Laid out across the top of one monitor, in overlay coordinates."""
 
-    def __init__(self, tools, monitor, values, origin=None):
+    def __init__(self, tools, monitor, values, origin=None, chosen=None):
         self.tools = tools
+        self.entries = grouped(tools)
         self.values = values
         self.monitor = monitor
+        self.chosen = {} if chosen is None else chosen
         self.settings_rect = None
         self.setting_buttons = []
         self.hovered = None
@@ -140,10 +174,12 @@ class Toolbar:
         buttons = []
         middle = self.rect.y + (theme.BAR_HEIGHT - theme.TOOL_BUTTON) / 2
         x = self.rect.x + theme.BAR_PADDING
-        for tool in self.tools:
-            buttons.append(
-                Button(TOOL, Rect(x, middle, theme.TOOL_BUTTON, theme.TOOL_BUTTON), tool=tool)
-            )
+        for members in self.entries:
+            buttons.append(Button(
+                TOOL, Rect(x, middle, theme.TOOL_BUTTON, theme.TOOL_BUTTON),
+                tool=members[0],
+                members=members if len(members) > 1 else None,
+            ))
             x += theme.TOOL_BUTTON + theme.TOOL_GAP
 
         capture_y = self.rect.y + (theme.BAR_HEIGHT - theme.CAPTURE_HEIGHT) / 2
@@ -238,6 +274,20 @@ class Toolbar:
 
     # -- sub-tool flyouts ---------------------------------------------------
 
+    def shown(self, button):
+        """The tool this button currently stands for.
+
+        A group shows whichever member was last picked from it, so the common
+        case stays one click. First member until something is picked.
+        """
+        if not button.members:
+            return button.tool
+        return self.chosen.get(button.members[0].group, button.members[0])
+
+    @staticmethod
+    def has_flyout(button):
+        return bool(button.members) or getattr(button.tool, "variants", None)
+
     @staticmethod
     def flyout_marker(button):
         """The corner of a tool button that opens its flyout.
@@ -251,9 +301,13 @@ class Toolbar:
         return Rect(rect.right - size, rect.bottom - size, size, size)
 
     def open_flyout(self, button):
-        """Lay the variants out beside the button, on whichever side fits."""
-        setting = button.tool.variants
-        options = list(setting.options())
+        """Lay the alternatives out beside the button, on whichever side fits.
+
+        Two kinds share this: a group of tools, and one tool's variants. They
+        differ only in what each entry carries and how it draws.
+        """
+        setting = None if button.members else button.tool.variants
+        options = list(button.members) if button.members else list(setting.options())
         step = theme.SETTINGS_OPTION + theme.SETTINGS_OPTION_GAP
         width = theme.FLYOUT_PADDING * 2 + theme.SETTINGS_OPTION
         height = theme.FLYOUT_PADDING * 2 + step * len(options) - \
@@ -266,14 +320,15 @@ class Toolbar:
 
         rect = Rect(x, y, width, height)
         buttons = []
-        for index, value in enumerate(options):
-            buttons.append(Button(
-                VARIANT,
-                Rect(x + theme.FLYOUT_PADDING,
-                     y + theme.FLYOUT_PADDING + index * step,
-                     theme.SETTINGS_OPTION, theme.SETTINGS_OPTION),
-                tool=button.tool, setting=setting, value=value,
-            ))
+        for index, option in enumerate(options):
+            spot = Rect(x + theme.FLYOUT_PADDING,
+                        y + theme.FLYOUT_PADDING + index * step,
+                        theme.SETTINGS_OPTION, theme.SETTINGS_OPTION)
+            if setting is None:
+                buttons.append(Button(VARIANT, spot, tool=option))
+            else:
+                buttons.append(Button(VARIANT, spot, tool=button.tool,
+                                      setting=setting, value=option))
         self.flyout = (button, rect, buttons)
 
     def draw_flyout(self, cr):
@@ -288,8 +343,14 @@ class Toolbar:
         for button in buttons:
             if button is self.hovered:
                 painting.fill_rounded(cr, button.rect, theme.BUTTON_HOVER, 4)
-            chosen = self.values.get(button.setting) == button.value
-            button.setting.draw_option(cr, button.rect, button.value, chosen)
+            if button.setting is None:
+                # A member of a group: it draws its own icon.
+                picked = self.chosen.get(button.tool.group) is button.tool
+                colour = theme.BUTTON_ICON_ACTIVE if picked else theme.BUTTON_ICON
+                button.tool.draw_icon(cr, button.rect, colour)
+            else:
+                picked = self.values.get(button.setting) == button.value
+                button.setting.draw_option(cr, button.rect, button.value, picked)
 
     def set_hover(self, x, y):
         """Returns True if the hovered button changed, meaning: redraw."""
@@ -306,12 +367,14 @@ class Toolbar:
         if button is None:
             return None
         if button.kind == TOOL:
-            return button.tool.label or None
+            return self.shown(button).label or None
         if button.kind == CANCEL:
             return "Close without capturing"
         if button.kind == SETTINGS:
             return "Settings"
         if button.kind == VARIANT:
+            if button.setting is None:
+                return button.tool.label or None
             return button.setting.caption(button.value)
         if button.kind == SETTING and not button.setting.draws_caption:
             return button.setting.caption(button.value)
@@ -394,6 +457,12 @@ class Toolbar:
             painting.fill_rounded(cr, button.rect, theme.BUTTON_HOVER)
 
         colour = theme.BUTTON_ICON_ACTIVE if active else theme.BUTTON_ICON
+        if button.members:
+            # A group wears the icon of whichever member is current, so the
+            # button says which tool it is rather than which family.
+            self.shown(button).draw_icon(cr, button.rect, colour)
+            self._draw_flyout_marker(cr, button, colour)
+            return
         variants = getattr(button.tool, "variants", None)
         if variants is None:
             button.tool.draw_icon(cr, button.rect, colour)
@@ -496,7 +565,7 @@ class PaletteToolbar(Toolbar):
         pad = theme.PALETTE_PADDING
         step = theme.TOOL_BUTTON + theme.TOOL_GAP
         columns = theme.PALETTE_COLUMNS
-        rows = -(-len(self.tools) // columns)  # ceiling division
+        rows = -(-len(self.entries) // columns)  # ceiling division
 
         width = pad * 2 + columns * step - theme.TOOL_GAP
         grid_height = rows * step - theme.TOOL_GAP
@@ -541,17 +610,18 @@ class PaletteToolbar(Toolbar):
         pad = theme.PALETTE_PADDING
         step = theme.TOOL_BUTTON + theme.TOOL_GAP
         buttons = []
-        for index, tool in enumerate(self.tools):
+        for index, members in enumerate(self.entries):
             row, column = divmod(index, theme.PALETTE_COLUMNS)
             buttons.append(Button(
                 TOOL,
                 Rect(self.rect.x + pad + column * step,
                      self.rect.y + theme.PALETTE_GRAB + pad + row * step,
                      theme.TOOL_BUTTON, theme.TOOL_BUTTON),
-                tool=tool,
+                tool=members[0],
+                members=members if len(members) > 1 else None,
             ))
 
-        rows = -(-len(self.tools) // theme.PALETTE_COLUMNS)
+        rows = -(-len(self.entries) // theme.PALETTE_COLUMNS)
         bottom = (self.rect.y + theme.PALETTE_GRAB + pad
                   + rows * step - theme.TOOL_GAP + theme.PALETTE_ROW_GAP)
         square = theme.CAPTURE_HEIGHT

@@ -47,15 +47,25 @@ def main():
         tool = factory()
         check("%s has a label" % tool.name, bool(tool.label), tool.label)
 
-    check.section("hovering a tool button reports its label")
+    check.section("every tool names itself, on its button or in its flyout")
+    # Grouped tools share a button, so the one hiding behind the group is
+    # reached through the flyout rather than by hovering the button.
     h = Harness(pixbuf, bounds)
     for factory in ALL_TOOLS:
         name = factory.name
         button = h.button(toolbar.TOOL, name)
-        h.move(*centre(button.rect))
-        check("%s -> %r" % (name, factory.label),
-              h.bar.tooltip_for(h.bar.hovered) == factory.label,
-              h.bar.tooltip_for(h.bar.hovered))
+        behind_a_group = button.members and h.bar.shown(button).name != name
+        if behind_a_group:
+            h.bar.open_flyout(button)
+            entry = next(b for b in h.bar.flyout[2] if b.tool.name == name)
+            said = h.bar.tooltip_for(entry)
+            h.bar.flyout = None
+        else:
+            h.move(*centre(button.rect))
+            said = h.bar.tooltip_for(h.bar.hovered)
+        check("%s -> %r%s" % (name, factory.label,
+                              " (in a flyout)" if behind_a_group else ""),
+              said == factory.label, said)
 
     check.section("the other buttons")
     h.move(*centre(h.button(toolbar.CANCEL).rect))
