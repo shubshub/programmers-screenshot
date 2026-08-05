@@ -18,7 +18,7 @@ from . import (  # noqa: I101
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.22.0"
+VERSION = "0.23.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1

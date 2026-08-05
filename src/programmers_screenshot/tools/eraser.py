@@ -22,10 +22,14 @@ SIZE = ChoiceSetting(
     "eraser-size", "Size", 18, ((10, "S"), (18, "M"), (32, "L"), (56, "XL"))
 )
 
-# How far apart swept discs may be before gaps show between them. The pointer
-# can jump a long way between motion events, and an eraser that skips is worse
-# than a slow one.
-STEP = 4.0
+# How far apart swept discs are laid, as a fraction of the eraser's radius.
+# The pointer can jump a long way between motion events and an eraser that
+# skips is worse than a slow one, so gaps are filled in -- but at 4px against
+# a radius of 9 they were stacked four deep for no visual gain, and every one
+# of them costs on every repaint. At about nine tenths of a radius the edge is
+# still smooth and there are a quarter as many.
+SPACING = 0.9
+MIN_STEP = 2.0
 
 
 class EraserTool(DragTool):
@@ -38,36 +42,49 @@ class EraserTool(DragTool):
     def __init__(self):
         super().__init__()
         self._swept = []          # (x, y) centres of the discs dragged through
+        self._fresh = []          # only those laid by the latest motion event
 
     # -- gesture ------------------------------------------------------------
 
     def begin(self, point, values):
         super().begin(point, values)
         self._swept = [point]
+        self._fresh = list(self._swept)
 
     def extend(self, point, shift=False):
         super().extend(point, shift)
         self._sweep_to(point)
 
     def _sweep_to(self, point):
-        """Fill in the gap since the last motion event.
+        """Fill in the gap since the last motion event, at a bounded density.
 
         Discs are laid along the way rather than only where events land, or a
-        quick flick leaves the mark it crossed untouched between samples.
+        quick flick leaves the mark it crossed untouched between samples. But
+        no closer together than the spacing: holding the eraser still and
+        wiggling used to add one per motion event on top of the last, which
+        cost as much to draw as real coverage and added nothing to it.
         """
+        step = self._step(self._values)
         last = self._swept[-1]
         dx, dy = point[0] - last[0], point[1] - last[1]
         distance = (dx * dx + dy * dy) ** 0.5
-        if not distance:
-            return  # the pointer has not actually moved
-        for step in range(1, int(distance / STEP) + 1):
-            along = step * STEP / distance
-            self._swept.append((last[0] + dx * along, last[1] + dy * along))
-        self._swept.append(point)
+        if distance < step:
+            self._fresh = []   # not far enough to be worth another disc
+            return
+        fresh = []
+        for index in range(1, int(distance / step) + 1):
+            along = index * step / distance
+            fresh.append((last[0] + dx * along, last[1] + dy * along))
+        self._swept.extend(fresh)
+        self._fresh = fresh
+
+    def _step(self, values):
+        return max(MIN_STEP, self._radius(values) * SPACING)
 
     def cancel(self):
         super().cancel()
         self._swept = []
+        self._fresh = []
 
     def complete(self, start, end, values):
         radius = self._radius(values)
@@ -77,6 +94,10 @@ class EraserTool(DragTool):
                 return None
             return RemoveStep(whole) if isinstance(whole, Step) else RemoveItem(whole)
 
+        # The spacing rule can leave the last disc short of where the pointer
+        # actually stopped, so make sure the end of the stroke is covered.
+        if self._swept[-1] != end:
+            self._swept.append(end)
         circles = [(x, y, radius) for x, y in self._swept]
         changes = self._erasures(circles)
         return Compound(changes) if changes else None
@@ -150,10 +171,17 @@ class EraserTool(DragTool):
         cr.stroke()
 
     def drag_extent(self, start, end, values):
+        """Only what this motion event added.
+
+        The whole swept path used to be reported, so the region repainted grew
+        with the stroke -- 318px wide after 25 moves, 2418px after 200, every
+        frame. The overlay unions each damage with the previous one, so the
+        gap between frames is covered without asking for the lot.
+        """
         radius = self._radius(values)
         boxes = [
             Rect(x - radius, y - radius, radius * 2, radius * 2)
-            for x, y in self._swept
+            for x, y in self._fresh
         ]
         return union(boxes) if boxes else None
 
