@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.21.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.22.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -221,6 +221,11 @@ what it took. The old value is written to
 .I ~/.config/programmers-screenshot/preferences.json
 What the settings window stores.
 .TP
+.I ~/.config/programmers-screenshot/state.json
+Bookkeeping the program keeps for itself: when it last asked about releases,
+which version it last mentioned, which version last ran. Kept apart from your
+settings so neither has to be edited around the other.
+.TP
 .I ~/.config/programmers-screenshot/displaced.json
 and
 .B \-\-uninstall\-hotkey
@@ -242,6 +247,21 @@ The capture was cancelled, or the screen could not be read.
 .TP
 .B 2
 The options given were contradictory.
+.SH UPDATES
+Off by default, and the only time the program touches the network. Switch it
+on in the settings window and it asks github.com once a day, after a capture
+has finished, in a process of its own \- never between the keypress and the
+overlay. If a newer release exists you get a notification with a button to the
+release notes. It will not download or install anything: this is a .deb, and
+apt is what installs it.
+.PP
+Nothing is sent, and nothing is said when there is nothing to say. Being up to
+date, being offline, being rate limited and getting a reply that does not
+parse are all silent.
+.PP
+Separately, and with no network involved, the first run after an upgrade
+reports what changed, read from the changelog shipped inside the package. Not
+on a first install, not on a downgrade, and not twice.
 .SH FILES
 .TP
 .I ~/Pictures/Screenshots
@@ -249,6 +269,11 @@ Default output directory, created on first use.
 .TP
 .I ~/.config/programmers-screenshot/preferences.json
 What the settings window stores.
+.TP
+.I ~/.config/programmers-screenshot/state.json
+Bookkeeping the program keeps for itself: when it last asked about releases,
+which version it last mentioned, which version last ran. Kept apart from your
+settings so neither has to be edited around the other.
 .TP
 .I ~/.config/programmers-screenshot/displaced.json
 GNOME shortcuts switched off to free the hotkey, kept so they can be restored.

@@ -1,3 +1,22 @@
+programmers-screenshot (0.22.0) noble; urgency=medium
+
+  * Optional update check. Switch it on in the settings window and the tool
+    asks github.com once a day whether a newer release exists, and shows a
+    notification with a button to the release notes if so. Off by default:
+    this is the only network call the program makes.
+  * The check runs in a process of its own after a capture has finished, so
+    nothing can put a network timeout between the keypress and the overlay.
+    It never downloads or installs anything.
+  * Silent whenever there is nothing to say: up to date, offline, rate
+    limited, or a reply that does not parse.
+  * The first run after an upgrade now reports what changed, read from the
+    changelog already shipped in the package. No network. Nothing on a first
+    install, on a downgrade, or twice for the same version.
+  * Bookkeeping moved to its own state.json, so machine state is not mixed
+    into the preferences you edit.
+
+ -- Shubshub  Tue, 05 Aug 2026 09:15:00 +1200
+
 programmers-screenshot (0.21.0) noble; urgency=medium
 
   * Related tools now share a button. Pen and Highlighter sit together under

@@ -22,7 +22,7 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
 )
 
-from programmers_screenshot import preferences, theme  # noqa: E402
+from programmers_screenshot import preferences, state, theme  # noqa: E402
 
 # The overlay reads stored preferences when it builds its toolbars, so without
 # this the suite would depend on whatever the person running it last chose in
@@ -30,6 +30,10 @@ from programmers_screenshot import preferences, theme  # noqa: E402
 # test process gets its own empty config and cleans it up on the way out.
 _CONFIG = tempfile.mkdtemp(prefix="programmers-screenshot-tests-")
 preferences.path = lambda: os.path.join(_CONFIG, "preferences.json")
+# Same for machine state: after_capture() records the version it ran and when
+# it last asked GitHub, so a test calling cli.main() would otherwise write to
+# the real config and change what the next real run does.
+state.path = lambda: os.path.join(_CONFIG, "state.json")
 atexit.register(shutil.rmtree, _CONFIG, ignore_errors=True)
 from programmers_screenshot.overlay import Overlay  # noqa: E402
 from programmers_screenshot.tools import build_tools  # noqa: E402

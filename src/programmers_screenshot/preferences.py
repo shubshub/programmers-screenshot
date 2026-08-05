@@ -31,6 +31,10 @@ DEFAULTS = {
     "toolbar": BAR,
     # Where the palette was left, as [x, y]. None means "work it out".
     "palette": None,
+    # Ask GitHub about newer releases. Off until asked: this is the only
+    # network call the program makes, and it should not start making it
+    # because someone pressed Print Screen.
+    "updates": False,
 }
 
 
@@ -63,7 +67,7 @@ def save(values):
 
 
 def build(values):
-    """Assemble the window. Returns (dialog, toggle, chooser, floating).
+    """Assemble the window. Returns the dialog and the widgets read on close.
 
     Split from edit() only so the greying-out can be checked without a person
     to click Close.
@@ -78,6 +82,12 @@ def build(values):
 
     floating = Gtk.CheckButton(label="Floating toolbar you can drag around")
     floating.set_active(values.get("toolbar") == PALETTE)
+
+    updates = Gtk.CheckButton(label="Check GitHub for new versions")
+    updates.set_tooltip_text(
+        "Asks github.com once a day, after a capture. Nothing else is sent."
+    )
+    updates.set_active(bool(values.get("updates")))
 
     caption = Gtk.Label(label="Folder", halign=Gtk.Align.START)
     chooser = Gtk.FileChooserButton.new(
@@ -100,8 +110,9 @@ def build(values):
     grid.attach(chooser, 1, 1, 1, 1)
     grid.attach(Gtk.Separator(), 0, 2, 2, 1)
     grid.attach(floating, 0, 3, 2, 1)
+    grid.attach(updates, 0, 4, 2, 1)
     dialog.get_content_area().add(grid)
-    return dialog, toggle, chooser, floating
+    return dialog, toggle, chooser, floating, updates
 
 
 def edit():
@@ -112,7 +123,7 @@ def edit():
     Overlay._edit_preferences for why both matter.
     """
     values = load()
-    dialog, toggle, chooser, floating = build(values)
+    dialog, toggle, chooser, floating, updates = build(values)
 
     dialog.show_all()
     dialog.run()
@@ -123,6 +134,7 @@ def edit():
         # None when the chooser never resolved a folder; keep what we had.
         "directory": chooser.get_filename() or values["directory"],
         "toolbar": PALETTE if floating.get_active() else BAR,
+        "updates": updates.get_active(),
     })
     dialog.destroy()
     save(chosen)
