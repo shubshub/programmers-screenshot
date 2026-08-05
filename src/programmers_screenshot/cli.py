@@ -12,11 +12,13 @@ gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
-from . import capture, hotkey, notifications, output, preferences, tools
+from . import (  # noqa: I101
+    capture, hotkey, notifications, output, preferences, tools, updates,
+)
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.21.0"
+VERSION = "0.22.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1
@@ -61,6 +63,12 @@ def build_parser():
     parser.add_argument(
         "--notification-agent", metavar="FILE", help=argparse.SUPPRESS
     )
+    # Internal: a notification carrying one link button, as JSON.
+    parser.add_argument("--notice", metavar="JSON", help=argparse.SUPPRESS)
+    # Internal: the detached update check, run well after any capture.
+    parser.add_argument(
+        "--check-updates", action="store_true", help=argparse.SUPPRESS
+    )
     parser.add_argument("--version", action="version", version=version_banner())
     return parser
 
@@ -86,6 +94,11 @@ def main(argv=None):
 
     if options.notification_agent:
         return notifications.run_agent(options.notification_agent)
+    if options.notice:
+        return notifications.run_notice(options.notice)
+    if options.check_updates:
+        updates.run_check(VERSION)
+        return EXIT_OK
     if options.uninstall_hotkey:
         return hotkey.uninstall()
     if options.install_hotkey:
@@ -114,6 +127,7 @@ def main(argv=None):
 
     if options.full:
         output.deliver(pixbuf, with_preferences(options))
+        after_capture(options)
         return EXIT_OK
 
     captured = run_overlay(pixbuf, bounds)
@@ -124,7 +138,25 @@ def main(argv=None):
     # the overlay is up, and the capture in hand has to honour what it says.
     # Reading at startup meant a change only took effect from the next run.
     output.deliver(captured, with_preferences(options))
+    after_capture(options)
     return EXIT_OK
+
+
+def after_capture(options):
+    """Version housekeeping, once the screenshot is safely delivered.
+
+    Deliberately last. Everything here can wait, and none of it may come
+    between pressing the key and seeing the overlay -- a network timeout in
+    that gap would be the worst bug this program could have.
+    """
+    updates.announce_upgrade(VERSION)
+    if not preferences.load().get("updates"):
+        return
+    if updates.due():
+        # A process of its own, so the request outlives us without us waiting
+        # on it. Reading one timestamp first keeps this to once a day rather
+        # than a spawn per screenshot.
+        notifications.spawn_detached(["--check-updates"])
 
 
 def with_preferences(options):
