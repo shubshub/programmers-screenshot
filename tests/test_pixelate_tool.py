@@ -11,8 +11,9 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
+gi.require_version("GdkPixbuf", "2.0")
 
-from gi.repository import Gdk, Gtk  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -28,6 +29,35 @@ from programmers_screenshot.geometry import Rect  # noqa: E402
 from programmers_screenshot.tools.pixelate import BLOCK, Pixelation  # noqa: E402
 
 
+CELL = 12   # px per flat cell: bigger than the fine block, smaller than the coarse
+
+
+def noisy_canvas(width=900, height=600):
+    """A mosaic of small flat cells, deterministic.
+
+    Cells rather than per-pixel noise: the point is to have detail that a
+    fine block preserves and a coarse block merges. Noise at pixel scale is
+    averaged flat by every block size alike, which measures nothing. CELL is
+    deliberately between the two block sizes under test.
+    """
+    pixbuf = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, width, height)
+    pixels = bytearray(pixbuf.get_pixels())
+    stride, channels = pixbuf.get_rowstride(), pixbuf.get_n_channels()
+    for y in range(height):
+        row, cell_y = y * stride, y // CELL
+        for x in range(width):
+            offset = row + x * channels
+            seed = (x // CELL) * 7919 + cell_y * 104729
+            pixels[offset] = (seed * 37) % 256
+            pixels[offset + 1] = (seed * 61) % 256
+            pixels[offset + 2] = (seed * 97) % 256
+    loaded = GdkPixbuf.Pixbuf.new_from_bytes(
+        GLib.Bytes.new(bytes(pixels)), GdkPixbuf.Colorspace.RGB, False, 8,
+        width, height, stride,
+    )
+    return loaded, Rect(0, 0, width, height)
+
+
 def distinct_colours(image, width, height, step=3):
     return len({
         pixel(image, px, py)
@@ -38,7 +68,11 @@ def distinct_colours(image, width, height, step=3):
 
 def main():
     Gtk.init_check()
-    pixbuf, bounds = capture.capture_screen(Gdk.Display.get_default())
+    # A synthetic canvas of fine detail rather than the live screen. Counting
+    # distinct colours only means anything if there are colours to lose, and
+    # a real desktop is sometimes a flat expanse -- which made this suite fail
+    # roughly at random depending on what happened to be on screen.
+    pixbuf, bounds = noisy_canvas()
     check = Checker()
 
     def pixelating(block=14):

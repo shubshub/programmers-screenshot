@@ -19,6 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from support import Checker, Harness, pixel  # noqa: E402
 
+from programmers_screenshot.toolbar import TOOL  # noqa: E402
+
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
 )
@@ -56,17 +58,24 @@ def main():
         h.overlay.values.set(WIDTH, width)
         return h
 
-    check.section("the tool is registered and offers three shapes")
+    check.section("the tool is registered and offers four shapes")
     h = Harness(pixbuf, bounds)
     check("line tool present", any(t.name == "line" for t in h.overlay.tools))
     h.use_tool("line")
+
+    # The shapes live in a flyout off the tool's own button, not on the
+    # settings row -- offering them in both places would ask twice.
     keys = {b.setting.key for b in h.bar.setting_buttons}
-    check("settings row has shape, colour and width",
-          keys == {"shape", "colour", "width"}, keys)
-    shapes = [b.value for b in h.bar.setting_buttons
-              if b.setting.key == "shape"]
-    check("four shapes offered",
+    check("the settings row has colour and width",
+          keys == {"colour", "width"}, keys)
+    check("and not shape, which the flyout owns", "shape" not in keys, keys)
+
+    button = h.button(TOOL, "line")
+    h.bar.open_flyout(button)
+    shapes = [b.value for b in h.bar.flyout[2]]
+    check("four shapes offered in the flyout",
           shapes == ["line", "box", "circle", "arrow"], shapes)
+    h.bar.flyout = None
 
     check.section("each shape commits its own kind of item")
     for shape, kind in (("line", Line), ("box", Box), ("circle", Ellipse),

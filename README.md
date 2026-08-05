@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.19.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.20.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.19.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.20.0_all.deb
 ```
 
 ## Bind it to a key

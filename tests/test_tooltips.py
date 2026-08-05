@@ -76,7 +76,6 @@ def main():
     h = Harness(pixbuf, bounds)
     h.use_tool("line")
     wanted = {
-        "shape": {"Line", "Rectangle", "Circle", "Arrow"},
         "width": {"2 px", "4 px", "8 px", "16 px"},
         "colour": {"Red", "Amber", "Green", "Blue", "White", "Black"},
     }
@@ -84,6 +83,16 @@ def main():
         buttons = [b for b in h.bar.setting_buttons if b.setting.key == key]
         said = {h.bar.tooltip_for(b) for b in buttons}
         check("%s options are named" % key, said == expected, sorted(s or "-" for s in said))
+
+    check.section("so do the shapes, which now live in a flyout")
+    # They moved off the settings row onto the line tool's own button, but a
+    # picture of a shape still needs a name on hover.
+    h.bar.open_flyout(h.button(toolbar.TOOL, "line"))
+    said = {h.bar.tooltip_for(b) for b in h.bar.flyout[2]}
+    check("shape options are named",
+          said == {"Line", "Rectangle", "Circle", "Arrow"},
+          sorted(s or "-" for s in said))
+    h.bar.flyout = None
 
     check.section("settings that already show their caption do not repeat it")
     h = Harness(pixbuf, bounds)

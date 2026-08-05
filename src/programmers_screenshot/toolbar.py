@@ -16,6 +16,11 @@ CAPTURE = "capture"
 CANCEL = "cancel"
 SETTINGS = "settings"   # the preferences window
 SETTING = "setting"    # one knob on the second row
+VARIANT = "variant"    # a sub-tool, offered in a flyout
+FLYOUT = "flyout"      # the marker on a button that opens one
+
+BAR = "bar"
+PALETTE = "palette"
 
 
 class Toolbars:
@@ -26,8 +31,35 @@ class Toolbars:
     the same state: pick a tool on one and it lights up on all of them.
     """
 
-    def __init__(self, tools, monitors, values):
-        self.bars = [Toolbar(tools, monitor, values) for monitor in monitors]
+    def __init__(self, tools, monitors, values, mode=BAR, origin=None):
+        self.mode = mode
+        if mode == PALETTE:
+            # One, not one each. You put it where you want it, and copies on
+            # the other screens would be clutter you could not get rid of.
+            self.bars = [PaletteToolbar(tools, monitors[0], values, origin)]
+        else:
+            self.bars = [Toolbar(tools, monitor, values) for monitor in monitors]
+
+    @property
+    def palette(self):
+        """The floating palette, or None in bar mode."""
+        return self.bars[0] if self.mode == PALETTE else None
+
+    def grab_at(self, x, y):
+        """True if this point is the palette's drag handle."""
+        palette = self.palette
+        return palette is not None and palette.grab_rect.contains(x, y)
+
+    def move_palette(self, x, y):
+        self.palette.move_to(x, y)
+
+    def close_flyouts(self):
+        changed = False
+        for bar in self.bars:
+            if bar.flyout is not None:
+                bar.flyout = None
+                changed = True
+        return changed
 
     @property
     def primary(self):
@@ -65,6 +97,10 @@ class Toolbars:
         for bar in self.bars:
             bar.draw_tooltip(cr)
 
+    def draw_flyouts(self, cr):
+        for bar in self.bars:
+            bar.draw_flyout(cr)
+
 
 @dataclass
 class Button:
@@ -78,16 +114,25 @@ class Button:
 class Toolbar:
     """Laid out across the top of one monitor, in overlay coordinates."""
 
-    def __init__(self, tools, monitor, values):
+    def __init__(self, tools, monitor, values, origin=None):
         self.tools = tools
         self.values = values
         self.monitor = monitor
-        self.rect = Rect(monitor.x, monitor.y, monitor.width, theme.BAR_HEIGHT)
-        self.buttons = self._layout_tools()
         self.settings_rect = None
         self.setting_buttons = []
         self.hovered = None
+        #: (button, rect, buttons) while a sub-tool flyout is open.
+        self.flyout = None
+        self.place(origin)
         self.show_settings_for(tools[0] if tools else None)
+
+    def place(self, origin=None):
+        """Work out where the controls sit. `origin` is ignored by a bar,
+        which is always across the top of its monitor."""
+        self.rect = Rect(
+            self.monitor.x, self.monitor.y, self.monitor.width, theme.BAR_HEIGHT
+        )
+        self.buttons = self._layout_tools()
 
     # -- layout ------------------------------------------------------------
 
@@ -119,9 +164,21 @@ class Toolbar:
         )
         return buttons
 
+    @staticmethod
+    def row_settings(tool):
+        """The settings that belong on the row rather than in a flyout.
+
+        A tool's variants are offered on its own button, so repeating them
+        here would be the same choice in two places.
+        """
+        settings = getattr(tool, "settings", ()) if tool else ()
+        variants = getattr(tool, "variants", None)
+        return tuple(s for s in settings if s is not variants)
+
     def show_settings_for(self, tool):
         """Rebuild the second row for a tool. No settings means no row."""
-        settings = getattr(tool, "settings", ()) if tool else ()
+        self.flyout = None
+        settings = self.row_settings(tool)
         if not settings:
             self.settings_rect = None
             self.setting_buttons = []
@@ -163,13 +220,76 @@ class Toolbar:
         """True if this point belongs to the bar rather than to the canvas."""
         if self.rect.contains(x, y):
             return True
-        return self.settings_rect is not None and self.settings_rect.contains(x, y)
+        if self.settings_rect is not None and self.settings_rect.contains(x, y):
+            return True
+        return self.flyout is not None and self.flyout[1].contains(x, y)
 
     def button_at(self, x, y):
+        # The flyout first: it is drawn over everything else, so it has to be
+        # hit before whatever it is covering.
+        if self.flyout is not None:
+            for button in self.flyout[2]:
+                if button.rect.contains(x, y):
+                    return button
         for button in self.buttons + self.setting_buttons:
             if button.rect.contains(x, y):
                 return button
         return None
+
+    # -- sub-tool flyouts ---------------------------------------------------
+
+    @staticmethod
+    def flyout_marker(button):
+        """The corner of a tool button that opens its flyout.
+
+        A marker rather than click-and-hold: several tools act on release, so
+        holding already means something, and a corner you can see beats a
+        gesture you cannot.
+        """
+        size = 9.0
+        rect = button.rect
+        return Rect(rect.right - size, rect.bottom - size, size, size)
+
+    def open_flyout(self, button):
+        """Lay the variants out beside the button, on whichever side fits."""
+        setting = button.tool.variants
+        options = list(setting.options())
+        step = theme.SETTINGS_OPTION + theme.SETTINGS_OPTION_GAP
+        width = theme.FLYOUT_PADDING * 2 + theme.SETTINGS_OPTION
+        height = theme.FLYOUT_PADDING * 2 + step * len(options) - \
+            theme.SETTINGS_OPTION_GAP
+
+        x = button.rect.right + theme.FLYOUT_GAP
+        if x + width > self.monitor.right:
+            x = button.rect.x - theme.FLYOUT_GAP - width   # no room; other side
+        y = min(button.rect.y, max(self.monitor.y, self.monitor.bottom - height))
+
+        rect = Rect(x, y, width, height)
+        buttons = []
+        for index, value in enumerate(options):
+            buttons.append(Button(
+                VARIANT,
+                Rect(x + theme.FLYOUT_PADDING,
+                     y + theme.FLYOUT_PADDING + index * step,
+                     theme.SETTINGS_OPTION, theme.SETTINGS_OPTION),
+                tool=button.tool, setting=setting, value=value,
+            ))
+        self.flyout = (button, rect, buttons)
+
+    def draw_flyout(self, cr):
+        if self.flyout is None:
+            return
+        _button, rect, buttons = self.flyout
+        painting.fill_rounded(cr, rect, theme.SETTINGS_BG, 5)
+        painting.use(cr, theme.BAR_EDGE)
+        cr.set_line_width(1.0)
+        painting.rounded_rect(cr, rect, 5)
+        cr.stroke()
+        for button in buttons:
+            if button is self.hovered:
+                painting.fill_rounded(cr, button.rect, theme.BUTTON_HOVER, 4)
+            chosen = self.values.get(button.setting) == button.value
+            button.setting.draw_option(cr, button.rect, button.value, chosen)
 
     def set_hover(self, x, y):
         """Returns True if the hovered button changed, meaning: redraw."""
@@ -191,6 +311,8 @@ class Toolbar:
             return "Close without capturing"
         if button.kind == SETTINGS:
             return "Settings"
+        if button.kind == VARIANT:
+            return button.setting.caption(button.value)
         if button.kind == SETTING and not button.setting.draws_caption:
             return button.setting.caption(button.value)
         return None  # Capture is already a word
@@ -270,8 +392,29 @@ class Toolbar:
             cr.stroke()
         elif button is self.hovered:
             painting.fill_rounded(cr, button.rect, theme.BUTTON_HOVER)
+
         colour = theme.BUTTON_ICON_ACTIVE if active else theme.BUTTON_ICON
-        button.tool.draw_icon(cr, button.rect, colour)
+        variants = getattr(button.tool, "variants", None)
+        if variants is None:
+            button.tool.draw_icon(cr, button.rect, colour)
+        else:
+            # Show which variant is chosen, the way a paint program does, so
+            # the button says what it will actually draw. The setting already
+            # knows how to paint one; active=False because the button draws
+            # its own selected state above.
+            variants.draw_option(cr, button.rect, self.values.get(variants), False)
+            self._draw_flyout_marker(cr, button, colour)
+
+    @staticmethod
+    def _draw_flyout_marker(cr, button, colour):
+        """A small wedge in the corner: there is more behind this one."""
+        marker = Toolbar.flyout_marker(button)
+        painting.use(cr, colour)
+        cr.move_to(marker.right - 1, marker.bottom - 1)
+        cr.line_to(marker.right - 1, marker.y + 2)
+        cr.line_to(marker.x + 2, marker.bottom - 1)
+        cr.close_path()
+        cr.fill()
 
     def _draw_capture(self, cr, button):
         background = theme.CAPTURE_BG
@@ -339,3 +482,180 @@ class Toolbar:
             first_option.y + (first_option.height - height) / 2,
             theme.SETTINGS_LABEL,
         )
+
+
+class PaletteToolbar(Toolbar):
+    """The same controls as a bar, in a rectangle you can drag around.
+
+    Tools in a grid rather than a row, so it stays roughly square instead of
+    stretching into a bar. Capture stays a full-width button: it is the point
+    of the program and should not be the thing you have to hunt for.
+    """
+
+    def place(self, origin=None):
+        pad = theme.PALETTE_PADDING
+        step = theme.TOOL_BUTTON + theme.TOOL_GAP
+        columns = theme.PALETTE_COLUMNS
+        rows = -(-len(self.tools) // columns)  # ceiling division
+
+        width = pad * 2 + columns * step - theme.TOOL_GAP
+        grid_height = rows * step - theme.TOOL_GAP
+        height = (theme.PALETTE_GRAB + pad + grid_height
+                  + theme.PALETTE_ROW_GAP + theme.CAPTURE_HEIGHT + pad)
+
+        x, y = origin if origin else self._default_origin(width)
+        self.rect = self._clamped(Rect(x, y, width, height))
+        self.buttons = self._layout_tools()
+
+    def _default_origin(self, width):
+        """Top left of the monitor, in far enough not to look like an accident."""
+        return (self.monitor.x + 40, self.monitor.y + 60)
+
+    def _clamped(self, rect):
+        """Keep the grab strip reachable.
+
+        Dragged fully off screen the palette could not be got back without
+        editing the config by hand, so the handle always stays on the monitor.
+        """
+        margin = 40.0
+        x = min(max(rect.x, self.monitor.x - rect.width + margin),
+                self.monitor.right - margin)
+        y = min(max(rect.y, self.monitor.y),
+                self.monitor.bottom - theme.PALETTE_GRAB)
+        return Rect(x, y, rect.width, rect.height)
+
+    def move_to(self, x, y):
+        """Put the palette here, then rebuild everything that sat on it."""
+        self.rect = self._clamped(Rect(x, y, self.rect.width, self.rect.height))
+        self.buttons = self._layout_tools()
+        active = self.flyout[0].tool if self.flyout else None
+        self.flyout = None
+        self._relayout_settings()
+        return active
+
+    @property
+    def grab_rect(self):
+        return Rect(self.rect.x, self.rect.y, self.rect.width, theme.PALETTE_GRAB)
+
+    def _layout_tools(self):
+        pad = theme.PALETTE_PADDING
+        step = theme.TOOL_BUTTON + theme.TOOL_GAP
+        buttons = []
+        for index, tool in enumerate(self.tools):
+            row, column = divmod(index, theme.PALETTE_COLUMNS)
+            buttons.append(Button(
+                TOOL,
+                Rect(self.rect.x + pad + column * step,
+                     self.rect.y + theme.PALETTE_GRAB + pad + row * step,
+                     theme.TOOL_BUTTON, theme.TOOL_BUTTON),
+                tool=tool,
+            ))
+
+        rows = -(-len(self.tools) // theme.PALETTE_COLUMNS)
+        bottom = (self.rect.y + theme.PALETTE_GRAB + pad
+                  + rows * step - theme.TOOL_GAP + theme.PALETTE_ROW_GAP)
+        square = theme.CAPTURE_HEIGHT
+        inner = self.rect.width - pad * 2
+        buttons.append(Button(
+            CAPTURE,
+            Rect(self.rect.x + pad, bottom,
+                 inner - (square + theme.TOOL_GAP) * 2, theme.CAPTURE_HEIGHT),
+        ))
+        buttons.append(Button(
+            SETTINGS,
+            Rect(self.rect.right - pad - square * 2 - theme.TOOL_GAP, bottom,
+                 square, theme.CAPTURE_HEIGHT),
+        ))
+        buttons.append(Button(
+            CANCEL,
+            Rect(self.rect.right - pad - square, bottom, square,
+                 theme.CAPTURE_HEIGHT),
+        ))
+        return buttons
+
+    # -- settings, stacked underneath rather than strung along a row --------
+
+    def show_settings_for(self, tool):
+        self.flyout = None
+        self._settings_for = self.row_settings(tool)
+        self._relayout_settings()
+
+    def _relayout_settings(self):
+        settings = getattr(self, "_settings_for", ())
+        if not settings:
+            self.settings_rect = None
+            self.setting_buttons = []
+            return
+
+        pad = theme.PALETTE_PADDING
+        step = theme.SETTINGS_OPTION + theme.SETTINGS_OPTION_GAP
+        rows = len(settings)
+        height = pad * 2 + rows * step - theme.SETTINGS_OPTION_GAP
+
+        self.settings_rect = Rect(
+            self.rect.x, self.rect.bottom, self.rect.width, height
+        )
+        self.setting_buttons = []
+        for row, setting in enumerate(settings):
+            x = self.settings_rect.x + pad
+            y = self.settings_rect.y + pad + row * step
+            for value in setting.options():
+                width = setting.option_width()
+                self.setting_buttons.append(Button(
+                    SETTING, Rect(x, y, width, theme.SETTINGS_OPTION),
+                    setting=setting, value=value,
+                ))
+                x += width + theme.SETTINGS_OPTION_GAP
+
+    def draw(self, cr, active_tool):
+        painting.fill_rounded(cr, self._whole(), theme.BAR_BG, 6)
+        self._draw_grab(cr)
+        for button in self.buttons:
+            if button.kind == TOOL:
+                self._draw_tool(cr, button, button.tool is active_tool)
+            elif button.kind == CAPTURE:
+                self._draw_capture(cr, button)
+            elif button.kind == SETTINGS:
+                self._draw_settings_button(cr, button)
+            else:
+                self._draw_cancel(cr, button)
+        if self.settings_rect is not None:
+            self._draw_settings(cr)
+        painting.use(cr, theme.BAR_EDGE)
+        cr.set_line_width(1.0)
+        painting.rounded_rect(cr, self._whole(), 6)
+        cr.stroke()
+
+    def _whole(self):
+        """The palette and its settings block, as one rounded rectangle."""
+        if self.settings_rect is None:
+            return self.rect
+        return Rect(self.rect.x, self.rect.y, self.rect.width,
+                    self.settings_rect.bottom - self.rect.y)
+
+    def _draw_grab(self, cr):
+        """Three lines, the usual sign for something you can pick up."""
+        grab = self.grab_rect
+        painting.use(cr, theme.SETTINGS_LABEL)
+        cr.set_line_width(1.0)
+        middle = grab.y + grab.height / 2
+        for offset in (-3, 0, 3):
+            cr.move_to(grab.x + grab.width / 2 - 12, middle + offset + 0.5)
+            cr.line_to(grab.x + grab.width / 2 + 12, middle + offset + 0.5)
+        cr.stroke()
+
+    def tooltip_box(self, cr, text, button):
+        """Below the palette, or above it when it is near the bottom."""
+        painting.select_font(cr, theme.FONT_UI, theme.FONT_SIZE_TOOLTIP)
+        width, height = painting.text_size(cr, text)
+        box_width = width + theme.TOOLTIP_PADDING * 2
+        box_height = height + theme.TOOLTIP_PADDING * 2
+
+        whole = self._whole()
+        y = whole.bottom + theme.TOOLTIP_GAP
+        if y + box_height > self.monitor.bottom:
+            y = whole.y - theme.TOOLTIP_GAP - box_height
+        x = button.rect.x + (button.rect.width - box_width) / 2
+        left = self.monitor.x + 4
+        right = self.monitor.right - box_width - 4
+        return Rect(min(max(x, left), max(left, right)), y, box_width, box_height)

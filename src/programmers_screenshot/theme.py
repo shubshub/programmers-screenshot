@@ -56,6 +56,16 @@ CAPTURE_HEIGHT = 32
 CORNER_RADIUS = 6
 HANDLE_SIZE = 4
 
+# The floating palette. Five tool columns is the narrowest grid that still
+# fits a six-swatch colour row underneath without wrapping it.
+PALETTE_COLUMNS = 5
+PALETTE_GRAB = 16
+PALETTE_PADDING = 8
+PALETTE_ROW_GAP = 6
+
+FLYOUT_PADDING = 5
+FLYOUT_GAP = 4      # between the button and the flyout beside it
+
 SETTINGS_HEIGHT = 40
 SETTINGS_OPTION = 26
 SETTINGS_OPTION_GAP = 5

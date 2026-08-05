@@ -81,7 +81,14 @@ class Overlay:
         # The one the pointer started on comes first and counts as primary.
         self.monitors = self._overlay_monitors()
         self.monitor = self.monitors[0]
-        self.toolbars = toolbar_module.Toolbars(tools, self.monitors, self.values)
+        stored = preferences.load()
+        origin = stored.get("palette")
+        self.toolbars = toolbar_module.Toolbars(
+            tools, self.monitors, self.values,
+            stored.get("toolbar", preferences.BAR),
+            tuple(origin) if origin else None,
+        )
+        self._moving_palette = None   # pointer offset while dragging it
 
     # -- setup -------------------------------------------------------------
 
@@ -238,6 +245,18 @@ class Overlay:
 
         return Gdk.pixbuf_get_from_surface(surface, 0, 0, width, height)
 
+    def _opens_flyout(self, button, x, y):
+        """True if the click landed on the corner marker rather than the tool."""
+        if getattr(button.tool, "variants", None) is None or x is None:
+            return False
+        if not toolbar_module.Toolbar.flyout_marker(button).contains(x, y):
+            return False
+        for bar in self.toolbars.bars:
+            if button in bar.buttons:
+                bar.open_flyout(button)
+        self.window.queue_draw()
+        return True
+
     def _choose_tool(self, tool):
         if tool is self.active_tool:
             return
@@ -247,8 +266,10 @@ class Overlay:
         self.toolbars.show_settings_for(tool)
         self.window.queue_draw()
 
-    def _activate(self, button):
+    def _activate(self, button, x=None, y=None):
         if button.kind == toolbar_module.TOOL:
+            if self._opens_flyout(button, x, y):
+                return
             self._choose_tool(button.tool)
         elif button.kind == toolbar_module.CAPTURE:
             self._capture_now()
@@ -256,6 +277,13 @@ class Overlay:
             self._finish(None)
         elif button.kind == toolbar_module.SETTINGS:
             self._edit_preferences()
+        elif button.kind == toolbar_module.VARIANT:
+            # Picking a sub-tool also picks its tool: you chose "arrow", not
+            # "arrow, and separately please switch to the line tool".
+            self.values.set(button.setting, button.value)
+            self.toolbars.close_flyouts()
+            self._choose_tool(button.tool)
+            self.window.queue_draw()
         elif button.kind == toolbar_module.SETTING:
             self.values.set(button.setting, button.value)
             self.active_tool.settings_changed(
@@ -281,12 +309,29 @@ class Overlay:
         self.window.get_display().get_default_seat().ungrab()
         self.window.hide()
         try:
-            preferences.edit()
+            chosen = preferences.edit()
         finally:
             self.window.show()
+        self._apply_toolbar_mode(chosen)
         # The pointer was elsewhere the whole time, so any hover is stale.
         self.toolbars.set_hover(-1, -1)
         self.window.queue_draw()
+
+    def _apply_toolbar_mode(self, chosen):
+        """Swap bar for palette, or back, without waiting for a restart.
+
+        The settings window is opened from the toolbar, so leaving this until
+        next launch would mean toggling it and seeing nothing happen.
+        """
+        wanted = (chosen or {}).get("toolbar", preferences.BAR)
+        if wanted == self.toolbars.mode:
+            return
+        origin = (chosen or {}).get("palette")
+        self.toolbars = toolbar_module.Toolbars(
+            self.tools, self.monitors, self.values, wanted,
+            tuple(origin) if origin else None,
+        )
+        self.toolbars.show_settings_for(self.active_tool)
 
     # -- input -------------------------------------------------------------
 
@@ -295,11 +340,22 @@ class Overlay:
             self._finish(None)
             return True
 
+        if self.toolbars.grab_at(event.x, event.y):
+            # Neither a button nor a canvas gesture: the palette is being
+            # picked up. The offset keeps it from jumping under the pointer.
+            palette = self.toolbars.palette
+            self._moving_palette = (event.x - palette.rect.x,
+                                    event.y - palette.rect.y)
+            return True
+
         if self.toolbars.covers(event.x, event.y):
             # Remember which button went down so a press-then-drag-away does
             # not fire it; the release decides.
             self._pressed_button = self.toolbars.button_at(event.x, event.y)
             return True
+
+        if self.toolbars.close_flyouts():
+            self.window.queue_draw()
 
         self._pressed_button = None
         # Clicking away is how a tool with lingering state is told it is done.
@@ -333,6 +389,10 @@ class Overlay:
         previous = self.pointer
         self.pointer = (event.x, event.y)
 
+        if self._moving_palette is not None:
+            self._drag_palette(event)
+            return True
+
         if self._dragging:
             self.active_tool.extend((event.x, event.y), _shift_held(event))
             self._redraw_gesture()
@@ -345,6 +405,24 @@ class Overlay:
         else:
             self._redraw_guides(previous)
         return True
+
+    def _drag_palette(self, event):
+        """Move the palette, repainting only what it left and where it landed."""
+        palette = self.toolbars.palette
+        vacated = palette._whole()
+        offset_x, offset_y = self._moving_palette
+        palette.move_to(event.x - offset_x, event.y - offset_y)
+        for area in (vacated, palette._whole()):
+            self.window.queue_draw_area(
+                int(area.x - 2), int(area.y - 2),
+                int(area.width + 4), int(area.height + 4),
+            )
+
+    def _remember_palette(self):
+        rect = self.toolbars.palette.rect
+        stored = preferences.load()
+        stored["palette"] = [rect.x, rect.y]
+        preferences.save(stored)
 
     def _redraw_guides(self, previous):
         """Move the crosshair without repainting the whole screen.
@@ -366,11 +444,16 @@ class Overlay:
         if event.button != 1:
             return True
 
+        if self._moving_palette is not None:
+            self._moving_palette = None
+            self._remember_palette()
+            return True
+
         if self._pressed_button is not None:
             button = self._pressed_button
             self._pressed_button = None
             if button.rect.contains(event.x, event.y):
-                self._activate(button)
+                self._activate(button, event.x, event.y)
             return True
 
         if self._dragging:
@@ -403,6 +486,9 @@ class Overlay:
                 self.window.queue_draw()
             return True
         if key == "Escape":
+            if self.toolbars.close_flyouts():
+                self.window.queue_draw()
+                return True
             if self._dragging:
                 self._dragging = False
                 self.active_tool.cancel()
@@ -478,6 +564,7 @@ class Overlay:
             self._draw_hint(cr)
 
         self.toolbars.draw(cr, self.active_tool)
+        self.toolbars.draw_flyouts(cr)
         if not self._dragging:
             # Hover is not tracked mid-gesture, so it would be stale.
             self.toolbars.draw_tooltip(cr)

@@ -47,6 +47,9 @@ class LineTool(ShapeTool):
     name = "line"
     label = "Line"
     settings = (SHAPE, COLOUR, WIDTH)
+    #: Shown in a flyout off this tool's own button rather than on the
+    #: settings row, so the button shows which shape it will draw.
+    variants = SHAPE
 
     def make_item(self, start, end, values):
         if start == end:
