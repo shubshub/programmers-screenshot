@@ -20,7 +20,18 @@ from gi.repository import GLib, Gtk  # noqa: E402
 
 from .paths import default_directory
 
-DEFAULTS = {"save": True, "directory": None}
+BAR = "bar"
+PALETTE = "palette"
+
+DEFAULTS = {
+    "save": True,
+    "directory": None,
+    # How the controls are presented: a bar across the top of every monitor,
+    # or one floating rectangle you drag where you want it.
+    "toolbar": BAR,
+    # Where the palette was left, as [x, y]. None means "work it out".
+    "palette": None,
+}
 
 
 def path():
@@ -52,7 +63,7 @@ def save(values):
 
 
 def build(values):
-    """Assemble the window. Returns (dialog, toggle, chooser).
+    """Assemble the window. Returns (dialog, toggle, chooser, floating).
 
     Split from edit() only so the greying-out can be checked without a person
     to click Close.
@@ -64,6 +75,9 @@ def build(values):
 
     toggle = Gtk.CheckButton(label="Save screenshots to a folder")
     toggle.set_active(bool(values["save"]))
+
+    floating = Gtk.CheckButton(label="Floating toolbar you can drag around")
+    floating.set_active(values.get("toolbar") == PALETTE)
 
     caption = Gtk.Label(label="Folder", halign=Gtk.Align.START)
     chooser = Gtk.FileChooserButton.new(
@@ -84,8 +98,10 @@ def build(values):
     grid.attach(toggle, 0, 0, 2, 1)
     grid.attach(caption, 0, 1, 1, 1)
     grid.attach(chooser, 1, 1, 1, 1)
+    grid.attach(Gtk.Separator(), 0, 2, 2, 1)
+    grid.attach(floating, 0, 3, 2, 1)
     dialog.get_content_area().add(grid)
-    return dialog, toggle, chooser
+    return dialog, toggle, chooser, floating
 
 
 def edit():
@@ -96,16 +112,18 @@ def edit():
     Overlay._edit_preferences for why both matter.
     """
     values = load()
-    dialog, toggle, chooser = build(values)
+    dialog, toggle, chooser, floating = build(values)
 
     dialog.show_all()
     dialog.run()
 
-    chosen = {
+    chosen = dict(values)
+    chosen.update({
         "save": toggle.get_active(),
         # None when the chooser never resolved a folder; keep what we had.
         "directory": chooser.get_filename() or values["directory"],
-    }
+        "toolbar": PALETTE if floating.get_active() else BAR,
+    })
     dialog.destroy()
     save(chosen)
     return chosen

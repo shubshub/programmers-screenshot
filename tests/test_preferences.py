@@ -124,8 +124,8 @@ def main():
 
         check.section("the folder chooser follows the toggle")
         if Gtk.init_check()[0]:
-            dialog, toggle, chooser = preferences.build(
-                {"save": True, "directory": home})
+            dialog, toggle, chooser, floating = preferences.build(
+                {"save": True, "directory": home, "toolbar": preferences.BAR})
             check("enabled while saving is on", chooser.get_sensitive())
             toggle.set_active(False)
             check("greyed out when switched off", not chooser.get_sensitive())
@@ -133,6 +133,8 @@ def main():
             check("and back again", chooser.get_sensitive())
             check("it starts on the stored folder",
                   chooser.get_filename() == home, chooser.get_filename())
+            check("and the floating toolbar is off by default",
+                  not floating.get_active())
             dialog.destroy()
         else:
             check("no display, so the window was not built", False,

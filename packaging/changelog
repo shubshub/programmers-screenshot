@@ -1,3 +1,23 @@
+programmers-screenshot (0.20.0) noble; urgency=medium
+
+  * The toolbar can now be a floating palette you drag around instead of a
+    bar across the top of every monitor. Switch in the settings window; it
+    takes effect at once and remembers where you put it. Bar remains the
+    default and is unchanged.
+  * One palette rather than one per monitor: you put it where you want it,
+    and copies on the other screens would be clutter you could not remove.
+  * Sub-tool flyouts. A tool with variants wears a wedge in the corner of its
+    button; clicking it opens the alternatives beside the button, on
+    whichever side has room. The line tool's line, rectangle, circle and
+    arrow have moved there from the settings row, and the button now shows
+    which of them is selected.
+  * The pixelate test no longer captures the live screen. It compared how
+    many colours survive coarse against fine blocks, which was a meaningless
+    comparison whenever the desktop happened to be a flat expanse, and made
+    the suite fail at random.
+
+ -- Shubshub  Tue, 04 Aug 2026 14:20:00 +1200
+
 programmers-screenshot (0.19.0) noble; urgency=medium
 
   * New Eraser tool: drag across the canvas to rub out the parts of any mark

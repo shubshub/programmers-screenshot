@@ -24,6 +24,11 @@ class Tool:
     icon_text = None  # optional glyph, drawn if draw_icon is not overridden
     settings = ()   # Setting instances this tool exposes
 
+    #: One of `settings`, if this tool is really several: the line tool draws
+    #: a line, a box, a circle or an arrow. Offered in a flyout off the tool's
+    #: own button, and left off the settings row so it is not asked twice.
+    variants = None
+
     #: True if a gesture from this tool sets the capture region. Starting one
     #: drops whatever region is already there.
     sets_region = False

@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.19.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.20.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -131,6 +131,19 @@ for one is the colour the next one uses.
 Hovering any button on either row names it, which is the only place the
 colour swatches and the line tool's shape icons are labelled.
 .SH INTERFACE
+.TP
+.B Floating toolbar
+Off by default. Turn it on in the settings window and the controls become one
+compact rectangle instead of a bar across every screen. Drag it by the ribbed
+strip along its top; it remembers where you left it, and cannot be dragged so
+far that the strip leaves the screen.
+.TP
+.B Sub-tools
+A tool that draws more than one thing wears a small wedge in the corner of its
+button. Click the wedge for a flyout of the alternatives \- the line tool
+offers a line, a rectangle, a circle and an arrow that way. The button itself
+shows whichever is chosen, so it says what it will draw. Escape or a click
+elsewhere closes the flyout.
 .TP
 .B Eraser
 Drag across the canvas to rub out the parts of any mark you sweep through:
