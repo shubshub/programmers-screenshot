@@ -13,12 +13,12 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 from . import (  # noqa: I101
-    capture, hotkey, notifications, output, preferences, tools, updates,
+    alerts, capture, hotkey, notifications, output, preferences, tools, updates,
 )
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.23.0"
+VERSION = "0.24.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1
@@ -63,8 +63,8 @@ def build_parser():
     parser.add_argument(
         "--notification-agent", metavar="FILE", help=argparse.SUPPRESS
     )
-    # Internal: a notification carrying one link button, as JSON.
-    parser.add_argument("--notice", metavar="JSON", help=argparse.SUPPRESS)
+    # Internal: an alert window carrying one link button, as JSON.
+    parser.add_argument("--alert", metavar="JSON", help=argparse.SUPPRESS)
     # Internal: the detached update check, run well after any capture.
     parser.add_argument(
         "--check-updates", action="store_true", help=argparse.SUPPRESS
@@ -94,8 +94,8 @@ def main(argv=None):
 
     if options.notification_agent:
         return notifications.run_agent(options.notification_agent)
-    if options.notice:
-        return notifications.run_notice(options.notice)
+    if options.alert:
+        return alerts.run(options.alert)
     if options.check_updates:
         updates.run_check(VERSION)
         return EXIT_OK

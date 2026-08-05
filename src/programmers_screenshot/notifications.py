@@ -7,7 +7,6 @@ offers actions is handed to a detached copy of ourselves running in agent
 mode, which lives only as long as the notification does.
 """
 
-import json
 import os
 import subprocess
 
@@ -25,7 +24,6 @@ ICON = "programmers-screenshot"
 
 OPEN_IMAGE = "open-image"
 OPEN_FOLDER = "open-folder"
-FOLLOW = "follow"      # the single action on a plain notice
 
 # The agent should never outlive its usefulness, even if the notification is
 # left sitting in the message tray.
@@ -65,56 +63,6 @@ def describe(path):
         detail.append("%d × %d" % (info[1], info[2]))
     detail.append(os.path.dirname(path))
     return "%s\n%s" % (os.path.basename(path), " · ".join(detail))
-
-
-def show_notice(summary, body, label, uri):
-    """A notification carrying one button that opens a link.
-
-    Its own detached process for the same reason announce_file() needs one:
-    a button belongs to a live program, and this one has to outlive us.
-    Falls back to a notification without the button rather than dropping the
-    message, since the message is the point and the button is a convenience.
-    """
-    payload = json.dumps(
-        {"summary": summary, "body": body, "label": label, "uri": uri}
-    )
-    if not spawn_detached(["--notice", payload]):
-        show_simple(summary, body)
-
-
-def run_notice(payload):
-    """Agent mode for show_notice: display it, wait for the button or the end."""
-    try:
-        notice = json.loads(payload)
-    except ValueError:
-        return 1
-
-    Notify.init(APP_NAME)
-    loop = GLib.MainLoop()
-    acting = {"now": False}
-
-    def activate(_notification, _action, _user_data=None):
-        acting["now"] = True
-        _launch_uri(notice.get("uri", ""))
-        GLib.timeout_add(LAUNCH_GRACE_MS, loop.quit)
-
-    notification = Notify.Notification.new(
-        notice.get("summary", ""), notice.get("body", ""), ICON
-    )
-    if notice.get("label") and notice.get("uri"):
-        notification.add_action(FOLLOW, notice["label"], activate, None)
-    notification.connect(
-        "closed", lambda *_: None if acting["now"] else loop.quit()
-    )
-
-    try:
-        notification.show()
-    except GLib.Error:
-        return 1
-
-    GLib.timeout_add_seconds(AGENT_LIFETIME_SECONDS, loop.quit)
-    loop.run()
-    return 0
 
 
 def spawn_detached(arguments):

@@ -23,7 +23,7 @@ import time
 import urllib.error
 import urllib.request
 
-from . import notifications, state
+from . import alerts, state
 from .paths import PROGRAM
 
 LATEST_URL = "https://api.github.com/repos/shubshub/programmers-screenshot/releases/latest"
@@ -115,9 +115,10 @@ def run_check(current, fetcher=fetch):
         return False   # already said so; do not nag every day
 
     state.remember(announced=tag)
-    notifications.show_notice(
+    alerts.show(
         "Update available",
-        "%s %s is out — you have %s." % (PROGRAM, tag.lstrip("v"), current),
+        "%s %s is out.\nYou have %s.\n\nInstall it with apt, or download the "
+        ".deb from the release page." % (PROGRAM, tag.lstrip("v"), current),
         "Release notes",
         page,
     )
@@ -183,7 +184,7 @@ def entry_for(version, text):
     return lines
 
 
-def upgrade_notice(current, bullets=3):
+def upgrade_notice(current, bullets=None):
     """What to say about having been upgraded to `current`, or None.
 
     Silent on a first install -- a changelog for versions you never ran is
@@ -196,7 +197,10 @@ def upgrade_notice(current, bullets=3):
     lines = entry_for(current, read_changelog())
     if not lines:
         return None
-    return ("Updated to %s" % current, "\n".join("• " + l for l in lines[:bullets]))
+    # All of them. A notification body had to be trimmed to fit; a window
+    # scrolls, so there is no reason to hide half of what changed.
+    shown = lines if bullets is None else lines[:bullets]
+    return ("Updated to %s" % current, "\n\n".join("• " + l for l in shown))
 
 
 def announce_upgrade(current):
@@ -205,6 +209,6 @@ def announce_upgrade(current):
     state.remember(ran=current)
     if notice is None:
         return False
-    summary, body = notice
-    notifications.show_notice(summary, body, "Release notes", RELEASES_URL)
+    heading, body = notice
+    alerts.show(heading, body, "Release notes", RELEASES_URL)
     return True
