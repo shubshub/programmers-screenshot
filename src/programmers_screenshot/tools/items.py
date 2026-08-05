@@ -56,7 +56,7 @@ class Item:
         cr.push_group()
         self.paint(cr)
         cr.set_operator(cairo.OPERATOR_CLEAR)
-        for x, y, radius in self.erased:
+        for x, y, radius in self._erased_within(cr.clip_extents()):
             cr.new_path()
             cr.arc(x, y, radius, 0, 2 * math.pi)
             cr.fill()
@@ -64,6 +64,22 @@ class Item:
         cr.pop_group_to_source()
         cr.paint()
         cr.restore()
+
+    def _erased_within(self, extents):
+        """The holes that could affect the region being repainted.
+
+        A partial redraw covers the pointer's neighbourhood, so nearly every
+        hole in a long erase stroke falls outside it and cannot change a
+        pixel. Punching them all regardless made the cost of a frame grow with
+        the length of the stroke, which is what made the eraser seize up after
+        a few seconds.
+        """
+        left, top, right, bottom = extents
+        return [
+            (x, y, radius) for x, y, radius in self.erased
+            if x + radius >= left and x - radius <= right
+            and y + radius >= top and y - radius <= bottom
+        ]
 
     def with_erasure(self, circles):
         """A copy with more taken out of it.

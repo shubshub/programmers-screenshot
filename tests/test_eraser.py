@@ -29,7 +29,8 @@ from support import Checker, Harness, render_overlay  # noqa: E402
 from programmers_screenshot import capture, theme  # noqa: E402
 from programmers_screenshot.actions import SetRegion  # noqa: E402
 from programmers_screenshot.geometry import Rect  # noqa: E402
-from programmers_screenshot.tools.eraser import SIZE  # noqa: E402
+from programmers_screenshot.tools.eraser import SIZE, EraserTool  # noqa: E402
+from programmers_screenshot.tools.items import Redaction  # noqa: E402
 from programmers_screenshot.tools.step import Step  # noqa: E402
 
 WHITE_CANVAS = 0xFFFFFFFF
@@ -37,6 +38,31 @@ WHITE_CANVAS = 0xFFFFFFFF
 # The redaction tool fills black by default, so a white backdrop is what makes
 # "bar" and "hole" tell apart. Black marks on a black canvas would have every
 # assertion below passing for the wrong reason.
+
+
+class CountingContext:
+    """A stand-in for a cairo context that counts the holes punched into it.
+
+    Everything is a no-op except clip_extents, which reports the region being
+    repainted, and arc, which is tallied. Enough for Item.draw(), and it
+    answers the only question a timing test could: how much work did that
+    frame actually do? Skipping far-away holes changes nothing you can see --
+    they are clipped away regardless -- so counting is the only way to catch
+    the filter being lost.
+    """
+
+    def __init__(self, extents):
+        self.extents = extents
+        self.arcs = 0
+
+    def clip_extents(self):
+        return self.extents
+
+    def arc(self, *_args):
+        self.arcs += 1
+
+    def __getattr__(self, _name):
+        return lambda *args, **kwargs: None
 
 
 def flat_harness(width=500, height=300):
@@ -268,6 +294,73 @@ def main():
           [len(i.erased) for i in h.items])
 
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    check.section("a long sweep does not get slower the longer it goes")
+    # It used to: the whole swept path was repainted every frame and every
+    # disc laid so far was punched into it, so cost grew with the stroke and
+    # the eraser seized up after a few seconds. These check the two causes
+    # rather than the clock, which would only be a flake waiting to happen.
+    tool = EraserTool()
+    tool.begin((80, 400), {"eraser-size": 18})
+    areas, counts = [], []
+    x = 80.0
+    for _ in range(8):
+        for _ in range(30):
+            x += 9
+            tool.extend((x, 400))
+        extent = tool.drag_extent((80, 400), (x, 400), {"eraser-size": 18})
+        areas.append(extent.width * extent.height)
+        counts.append(len(tool._swept))
+
+    check("the swept path keeps growing, as it must",
+          counts[-1] > counts[0] * 4, counts)
+    check("but the area repainted each frame does not",
+          max(areas) < min(areas) * 2, areas)
+    check("and it stays about one disc across",
+          max(areas) < (18 * 4) ** 2, max(areas))
+
+    check.section("holes outside the repainted area are skipped")
+    spread = [(100 + i * 2, 400, 9) for i in range(400)]
+    mark = Redaction((50, 350), (950, 450), (0, 0, 0), 0).with_erasure(spread)
+    near = mark._erased_within((500, 380, 560, 420))
+    check("only the ones that could change a pixel",
+          len(near) < 40, "%d of %d" % (len(near), len(spread)))
+    check("and none of the far ones",
+          all(480 <= c[0] <= 580 for c in near), near[:3])
+    check("with everything on show, they all count",
+          len(mark._erased_within((0, 0, 2000, 2000))) == len(spread))
+
+    check.section("and draw() really does skip them")
+    # Removing the filter changes nothing you can see -- the holes are clipped
+    # away regardless -- so only counting the work catches it. This context
+    # records how many arcs were actually punched.
+    counting = CountingContext((500, 380, 560, 420))
+    mark.draw(counting)
+    check("only the holes near the repainted area are punched",
+          counting.arcs < 40, "%d of %d" % (counting.arcs, len(spread)))
+
+    everything = CountingContext((0, 0, 2000, 2000))
+    mark.draw(everything)
+    check("with the whole mark on show, all of them are",
+          everything.arcs == len(spread), everything.arcs)
+
+    check.section("standing still does not pile them up")
+    idle = EraserTool()
+    idle.begin((500, 400), {"eraser-size": 18})
+    for i in range(300):
+        idle.extend((500 + (i % 3), 400 + (i % 2)))
+    check("300 events in one spot leave almost nothing",
+          len(idle._swept) <= 3, len(idle._swept))
+
+    slow = EraserTool()
+    slow.begin((500, 400), {"eraser-size": 18})
+    for i in range(300):
+        slow.extend((500 + i * 2, 400))
+    check("a slow 600px drag is spaced, not one per event",
+          len(slow._swept) < 100, len(slow._swept))
+    check("but still covers the ground",
+          slow._swept[-1][0] >= 1080, slow._swept[-1])
+
     check.section("clicking a step badge still renumbers the rest")
     h = Harness(pixbuf, bounds)
     x, y = h.canvas_point()

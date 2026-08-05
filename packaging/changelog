@@ -1,3 +1,17 @@
+programmers-screenshot (0.23.0) noble; urgency=medium
+
+  * Fix: the eraser ground to a halt after a few seconds of dragging, and
+    recovered only when you let go. Two things grew with the length of a
+    stroke and multiplied: the whole swept path was repainted every frame,
+    and every hole made so far was punched into it again. Only the part that
+    moved is repainted now, and only holes that could change a pixel in it
+    are punched. Cost per frame no longer grows with the stroke.
+  * Holes are also spaced by about the eraser's radius rather than every 4
+    pixels. They were stacked four deep for no visual gain, and holding the
+    eraser still used to add another on every mouse event.
+
+ -- Shubshub  Tue, 05 Aug 2026 11:40:00 +1200
+
 programmers-screenshot (0.22.0) noble; urgency=medium
 
   * Optional update check. Switch it on in the settings window and the tool
