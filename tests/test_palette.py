@@ -70,9 +70,9 @@ def main():
           palette.rect.width < MONITOR.width / 2, palette.rect.width)
     check("it sits over the screen, not above it",
           palette.rect.y > MONITOR.y, palette.rect.y)
-    check("every tool has a button",
+    check("a button per tool or group, not per tool",
           len([b for b in palette.buttons if b.kind == tb.TOOL])
-          == len(palette.tools), len(palette.buttons))
+          == len(palette.entries), len(palette.entries))
     for kind in (tb.CAPTURE, tb.CANCEL, tb.SETTINGS):
         check("%s is reachable on it" % kind,
               any(b.kind == kind for b in palette.buttons))
@@ -188,6 +188,48 @@ def main():
     check("switching back restores a bar per monitor",
           len(h.overlay.toolbars.bars) == len(h.overlay.monitors),
           len(h.overlay.toolbars.bars))
+
+    check.section("related tools share one button")
+    bar2 = tb.Toolbar(build_tools(), MONITOR, SettingValues())
+    names = [[m.name for m in e] for e in bar2.entries]
+    check("pen and highlighter are one entry",
+          ["pen", "highlight"] in names, names)
+    check("black bar and pixelate are another",
+          ["redact", "pixelate"] in names, names)
+    check("eleven tools become nine buttons",
+          len([b for b in bar2.buttons if b.kind == tb.TOOL]) == 9,
+          len([b for b in bar2.buttons if b.kind == tb.TOOL]))
+    check("ungrouped tools are untouched",
+          ["rectangle"] in names and ["eraser"] in names, names)
+
+    check.section("the group button shows, and remembers, its member")
+    group = next(b for b in bar2.buttons if b.members
+                 and b.members[0].group == "Redact")
+    check("it starts on the first member",
+          bar2.shown(group).label == "Black Bar", bar2.shown(group).label)
+    check("and it has a flyout to open", tb.Toolbar.has_flyout(group))
+
+    bar2.open_flyout(group)
+    entries = bar2.flyout[2]
+    check("the flyout lists the members",
+          [b.tool.label for b in entries] == ["Black Bar", "Pixelate"],
+          [b.tool.label for b in entries])
+    check("they carry a tool, not a setting value",
+          entries[0].setting is None and entries[0].tool is not None)
+
+    # Choosing the second member is what the overlay records.
+    holder = types.SimpleNamespace(chosen=bar2.chosen)
+    tb.Toolbars.choose_member(holder, entries[1])
+    check("the group now shows Pixelate",
+          bar2.shown(group).label == "Pixelate", bar2.shown(group).label)
+    check("so one click gets it next time, no flyout needed",
+          bar2.shown(group) is entries[1].tool)
+
+    check.section("a tool without a group has no flyout")
+    plain = next(b for b in bar2.buttons
+                 if b.kind == tb.TOOL and b.tool.name == "eraser")
+    check("no members", plain.members is None)
+    check("and nothing behind it", not tb.Toolbar.has_flyout(plain))
 
     check.section("the preference decides which you get")
     check("bar is the default", preferences.DEFAULTS["toolbar"] == tb.BAR,

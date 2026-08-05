@@ -24,6 +24,10 @@ class Tool:
     icon_text = None  # optional glyph, drawn if draw_icon is not overridden
     settings = ()   # Setting instances this tool exposes
 
+    #: Tools sharing a group share one toolbar button, with a flyout to pick
+    #: between them. The string is the group's name as well as its key.
+    group = None
+
     #: One of `settings`, if this tool is really several: the line tool draws
     #: a line, a box, a circle or an arrow. Offered in a flyout off the tool's
     #: own button, and left off the settings row so it is not asked twice.

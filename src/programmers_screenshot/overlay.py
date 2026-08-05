@@ -247,7 +247,7 @@ class Overlay:
 
     def _opens_flyout(self, button, x, y):
         """True if the click landed on the corner marker rather than the tool."""
-        if getattr(button.tool, "variants", None) is None or x is None:
+        if x is None or not toolbar_module.Toolbar.has_flyout(button):
             return False
         if not toolbar_module.Toolbar.flyout_marker(button).contains(x, y):
             return False
@@ -270,7 +270,7 @@ class Overlay:
         if button.kind == toolbar_module.TOOL:
             if self._opens_flyout(button, x, y):
                 return
-            self._choose_tool(button.tool)
+            self._choose_tool(self.toolbars.shown(button))
         elif button.kind == toolbar_module.CAPTURE:
             self._capture_now()
         elif button.kind == toolbar_module.CANCEL:
@@ -278,9 +278,14 @@ class Overlay:
         elif button.kind == toolbar_module.SETTINGS:
             self._edit_preferences()
         elif button.kind == toolbar_module.VARIANT:
-            # Picking a sub-tool also picks its tool: you chose "arrow", not
-            # "arrow, and separately please switch to the line tool".
-            self.values.set(button.setting, button.value)
+            if button.setting is None:
+                # A member of a group. Remembered, so the group button keeps
+                # showing it and one click picks it next time.
+                self.toolbars.choose_member(button)
+            else:
+                # A variant of one tool: you chose "arrow", not "arrow, and
+                # separately please switch to the line tool".
+                self.values.set(button.setting, button.value)
             self.toolbars.close_flyouts()
             self._choose_tool(button.tool)
             self.window.queue_draw()
@@ -329,7 +334,7 @@ class Overlay:
         origin = (chosen or {}).get("palette")
         self.toolbars = toolbar_module.Toolbars(
             self.tools, self.monitors, self.values, wanted,
-            tuple(origin) if origin else None,
+            tuple(origin) if origin else None, self.toolbars.chosen,
         )
         self.toolbars.show_settings_for(self.active_tool)
 

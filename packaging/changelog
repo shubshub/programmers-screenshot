@@ -1,3 +1,18 @@
+programmers-screenshot (0.21.0) noble; urgency=medium
+
+  * Related tools now share a button. Pen and Highlighter sit together under
+    Ink; Black Bar and Pixelate under Redact. Eleven buttons become nine,
+    which on the floating palette is two rows instead of three.
+  * The redaction tool is now called Black Bar, since Redact is the name of
+    the pair it belongs to.
+  * A group button shows whichever member you last picked and remembers it,
+    so the common case stays a single click; the corner wedge opens the rest.
+  * Fix: the test suite read the real preferences file, so whatever was last
+    chosen in the settings window changed how the tests behaved. It now uses
+    a config of its own.
+
+ -- Shubshub  Tue, 04 Aug 2026 16:05:00 +1200
+
 programmers-screenshot (0.20.0) noble; urgency=medium
 
   * The toolbar can now be a floating palette you drag around instead of a

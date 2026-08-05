@@ -11,6 +11,7 @@ class PenTool(Tool):
 
     name = "pen"
     label = "Pen"
+    group = "Ink"
     settings = (COLOUR, WIDTH)
 
     def __init__(self):

@@ -4,8 +4,11 @@ Drives the overlay's real event handlers with stand-in events, against a real
 GTK display but without ever mapping a window.
 """
 
+import atexit
 import os
+import shutil
 import sys
+import tempfile
 import types
 
 import gi
@@ -19,7 +22,15 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
 )
 
-from programmers_screenshot import theme  # noqa: E402
+from programmers_screenshot import preferences, theme  # noqa: E402
+
+# The overlay reads stored preferences when it builds its toolbars, so without
+# this the suite would depend on whatever the person running it last chose in
+# the settings window -- a palette left switched on broke half of it. Each
+# test process gets its own empty config and cleans it up on the way out.
+_CONFIG = tempfile.mkdtemp(prefix="programmers-screenshot-tests-")
+preferences.path = lambda: os.path.join(_CONFIG, "preferences.json")
+atexit.register(shutil.rmtree, _CONFIG, ignore_errors=True)
 from programmers_screenshot.overlay import Overlay  # noqa: E402
 from programmers_screenshot.tools import build_tools  # noqa: E402
 
@@ -163,10 +174,21 @@ class Harness:
         return self.overlay.toolbars.primary
 
     def button(self, kind, tool_name=None):
+        """The button for a tool, or the group button standing in for it.
+
+        A grouped tool has no button of its own -- the highlighter lives
+        behind the pen -- so this returns the group, and the caller can look
+        in its flyout.
+        """
         for candidate in self.bar.buttons:
-            if candidate.kind == kind and (
-                tool_name is None or getattr(candidate.tool, "name", None) == tool_name
-            ):
+            if candidate.kind != kind:
+                continue
+            if tool_name is None:
+                return candidate
+            if getattr(candidate.tool, "name", None) == tool_name:
+                return candidate
+            members = candidate.members or ()
+            if any(member.name == tool_name for member in members):
                 return candidate
         raise AssertionError("no %s button on the toolbar" % kind)
 

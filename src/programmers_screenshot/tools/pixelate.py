@@ -102,6 +102,7 @@ class PixelateTool(ShapeTool):
 
     name = "pixelate"
     label = "Pixelate"
+    group = "Redact"
     settings = (BLOCK,)
 
     def make_item(self, start, end, values):
