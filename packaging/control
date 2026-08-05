@@ -28,8 +28,8 @@ Description: Minimal region screenshot tool for hotkey binding
  measurement, colour picking, redaction, pixelation, numbered step and
  text tools.
  .
- It does one thing on one keypress: no editor, no dialogs, no upload
- prompts. Register a GNOME shortcut with --install-hotkey, or point any
+ It does one thing on one keypress: mark up, capture, done. No editor, no
+ upload prompts, and nothing between the key and the overlay. Register a GNOME shortcut with --install-hotkey, or point any
  shortcut at the programmers-screenshot command.
  .
  Works on GNOME under X11 and Wayland, and spans multi-monitor layouts.

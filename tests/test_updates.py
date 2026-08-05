@@ -19,7 +19,13 @@ ROOT = os.path.join(HERE, os.pardir)
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, HERE)
 
-from programmers_screenshot import notifications, state, updates  # noqa: E402
+import gi  # noqa: E402
+
+gi.require_version("Gtk", "3.0")
+
+from gi.repository import Gtk  # noqa: E402
+
+from programmers_screenshot import alerts, state, updates  # noqa: E402
 
 CHANGELOG = """\
 programmers-screenshot (0.21.0) noble; urgency=medium
@@ -59,11 +65,11 @@ class Checker:
 def main():
     check = Checker()
     home = tempfile.mkdtemp(prefix="programmers-screenshot-updates-")
-    real_path, real_notice = state.path, notifications.show_notice
+    real_path, real_show = state.path, alerts.show
     state.path = lambda: os.path.join(home, "state.json")
 
     said = []
-    notifications.show_notice = lambda *a: said.append(a)
+    alerts.show = lambda *a: said.append(a)
 
     try:
         # --------------------------------------------------------------
@@ -95,6 +101,8 @@ def main():
         check("a newer release is announced", len(said) == 1, said)
         check("naming both versions",
               "0.22.0" in said[0][1] and "0.21.0" in said[0][1], said[0][1])
+        check("as an alert window, not a desktop notification",
+              said[0][0] == "Update available", said[0][0])
         check("with a button to the page", said[0][3] == "https://example/rel")
         check("and the check is timestamped",
               isinstance(state.load().get("checked"), float))
@@ -148,6 +156,8 @@ def main():
             check("an upgrade is reported", notice is not None)
             check("naming the new version", "0.21.0" in notice[0], notice[0])
             check("and listing what changed", "Black Bar" in notice[1], notice[1])
+            check("all of it, since a window can scroll",
+                  notice[1].count("•") == 2, notice[1])
 
             state.save({"ran": "0.21.0"})
             check("the same version again is silent",
@@ -175,13 +185,38 @@ def main():
         check("no notice, no exception", updates.upgrade_notice("0.21.0") is None)
         updates.read_changelog = real_read
 
+        check.section("the alert is a window, and it builds")
+        if Gtk.init_check()[0]:
+            window = alerts.build({
+                "heading": "Update available", "body": "0.23.0 is out.",
+                "label": "Release notes", "uri": "https://example/rel",
+            })
+            labels = [c.get_label()
+                      for c in window.get_action_area().get_children()]
+            check("it can be dismissed", "Close" in labels, labels)
+            check("and offers the link", "Release notes" in labels, labels)
+            window.destroy()
+
+            # An entry with no link should not grow an empty button.
+            plain = alerts.build({"heading": "Updated", "body": "• a thing",
+                                  "label": None, "uri": None})
+            labels = [c.get_label()
+                      for c in plain.get_action_area().get_children()]
+            check("with no link, only Close", labels == ["Close"], labels)
+            plain.destroy()
+
+            check("a malformed payload is refused, not crashed on",
+                  alerts.run("{not json") == 1)
+        else:
+            check("a display is available to build the window", False)
+
         check.section("state that cannot be read means nothing is known")
         with open(state.path(), "w", encoding="utf-8") as handle:
             handle.write("{not json")
         check("it reads as empty", state.load() == {}, state.load())
         check("so a check is due", updates.due())
     finally:
-        state.path, notifications.show_notice = real_path, real_notice
+        state.path, alerts.show = real_path, real_show
         shutil.rmtree(home, ignore_errors=True)
 
     return check.report()

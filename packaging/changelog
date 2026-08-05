@@ -1,3 +1,16 @@
+programmers-screenshot (0.24.0) noble; urgency=medium
+
+  * The update notice and the post-upgrade changelog are now windows rather
+    than desktop notifications. A notification vanishes while you are looking
+    somewhere else, and truncates a changelog to a couple of lines; a window
+    waits to be dismissed and scrolls.
+  * The whole changelog entry is shown, rather than the first three bullets
+    that fitted in a notification.
+  * The package description no longer claims there are no dialogs. There have
+    been since the settings window, and there are more now.
+
+ -- Shubshub  Tue, 05 Aug 2026 13:10:00 +1200
+
 programmers-screenshot (0.23.0) noble; urgency=medium
 
   * Fix: the eraser ground to a halt after a few seconds of dragging, and

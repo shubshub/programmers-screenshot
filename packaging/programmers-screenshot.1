@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.23.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.24.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -252,16 +252,17 @@ Off by default, and the only time the program touches the network. Switch it
 on in the settings window and it asks github.com once a day, after a capture
 has finished, in a process of its own \- never between the keypress and the
 overlay. If a newer release exists you get a notification with a button to the
-release notes. It will not download or install anything: this is a .deb, and
-apt is what installs it.
+release notes. It is a window rather than a desktop notification, so it waits
+to be dismissed instead of vanishing while you are looking elsewhere. It will
+not download or install anything: this is a .deb, and apt is what installs it.
 .PP
 Nothing is sent, and nothing is said when there is nothing to say. Being up to
 date, being offline, being rate limited and getting a reply that does not
 parse are all silent.
 .PP
 Separately, and with no network involved, the first run after an upgrade
-reports what changed, read from the changelog shipped inside the package. Not
-on a first install, not on a downgrade, and not twice.
+reports what changed in a window, read from the changelog shipped inside the
+package. Not on a first install, not on a downgrade, and not twice.
 .SH FILES
 .TP
 .I ~/Pictures/Screenshots
