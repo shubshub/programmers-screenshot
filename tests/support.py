@@ -35,6 +35,7 @@ preferences.path = lambda: os.path.join(_CONFIG, "preferences.json")
 # the real config and change what the next real run does.
 state.path = lambda: os.path.join(_CONFIG, "state.json")
 atexit.register(shutil.rmtree, _CONFIG, ignore_errors=True)
+from programmers_screenshot import toolbar  # noqa: E402
 from programmers_screenshot.overlay import Overlay  # noqa: E402
 from programmers_screenshot.tools import build_tools  # noqa: E402
 
@@ -120,8 +121,25 @@ def render_overlay(harness):
 class Harness:
     """An Overlay with its window and exit path stubbed out."""
 
-    def __init__(self, pixbuf, bounds, tools=None):
+    def __init__(self, pixbuf, bounds, tools=None, monitors=None):
+        """One monitor the size of the canvas, unless told otherwise.
+
+        The overlay asks the display where the monitors are, and puts a bar at
+        the top of each. Left to do that, a test's layout depends on the real
+        desk it runs at: where the monitors sit, and -- since the first one is
+        whichever the pointer is on -- where the mouse happens to be. Both
+        have made this suite fail for reasons that had nothing to do with the
+        code. Tests that genuinely want several monitors ask for them.
+        """
         self.overlay = Overlay(pixbuf, bounds, tools or build_tools())
+        screens = [bounds] if monitors is None else list(monitors)
+        self.overlay.monitors = screens
+        self.overlay.monitor = screens[0]
+        self.overlay.toolbars = toolbar.Toolbars(
+            self.overlay.tools, screens, self.overlay.values,
+            self.overlay.toolbars.mode, None, self.overlay.toolbars.chosen,
+        )
+        self.overlay.toolbars.show_settings_for(self.overlay.active_tool)
         self.overlay.window = types.SimpleNamespace(
             queue_draw=lambda: None, queue_draw_area=lambda *a: None
         )

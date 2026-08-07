@@ -41,7 +41,7 @@ class Toolbars:
             # One, not one each. You put it where you want it, and copies on
             # the other screens would be clutter you could not get rid of.
             self.bars = [PaletteToolbar(tools, monitors[0], values, origin,
-                                        self.chosen)]
+                                        self.chosen, monitors)]
         else:
             self.bars = [Toolbar(tools, monitor, values, None, self.chosen)
                          for monitor in monitors]
@@ -146,11 +146,14 @@ def grouped(tools):
 class Toolbar:
     """Laid out across the top of one monitor, in overlay coordinates."""
 
-    def __init__(self, tools, monitor, values, origin=None, chosen=None):
+    def __init__(self, tools, monitor, values, origin=None, chosen=None,
+                 monitors=None):
         self.tools = tools
         self.entries = grouped(tools)
         self.values = values
         self.monitor = monitor
+        #: Every monitor, for anything that can move between them.
+        self.monitors = list(monitors) if monitors else [monitor]
         self.chosen = {} if chosen is None else chosen
         self.settings_rect = None
         self.setting_buttons = []
@@ -274,6 +277,10 @@ class Toolbar:
 
     # -- sub-tool flyouts ---------------------------------------------------
 
+    def current_monitor(self):
+        """The screen these controls are on. A bar never leaves its own."""
+        return self.monitor
+
     def shown(self, button):
         """The tool this button currently stands for.
 
@@ -313,10 +320,11 @@ class Toolbar:
         height = theme.FLYOUT_PADDING * 2 + step * len(options) - \
             theme.SETTINGS_OPTION_GAP
 
+        screen = self.current_monitor()
         x = button.rect.right + theme.FLYOUT_GAP
-        if x + width > self.monitor.right:
+        if x + width > screen.right:
             x = button.rect.x - theme.FLYOUT_GAP - width   # no room; other side
-        y = min(button.rect.y, max(self.monitor.y, self.monitor.bottom - height))
+        y = min(button.rect.y, max(screen.y, screen.bottom - height))
 
         rect = Rect(x, y, width, height)
         buttons = []
@@ -391,10 +399,11 @@ class Toolbar:
         box_width = width + theme.TOOLTIP_PADDING * 2
         box_height = height + theme.TOOLTIP_PADDING * 2
 
+        screen = self.current_monitor()
         below = self.settings_rect.bottom if self.settings_rect else self.rect.bottom
         x = button.rect.x + (button.rect.width - box_width) / 2
-        left = self.monitor.x + 4
-        right = self.monitor.right - box_width - 4
+        left = screen.x + 4
+        right = screen.right - box_width - 4
         return Rect(
             min(max(x, left), max(left, right)),
             below + theme.TOOLTIP_GAP,
@@ -581,17 +590,47 @@ class PaletteToolbar(Toolbar):
         return (self.monitor.x + 40, self.monitor.y + 60)
 
     def _clamped(self, rect):
-        """Keep the grab strip reachable.
+        """Keep the grab strip on a screen -- any screen.
 
-        Dragged fully off screen the palette could not be got back without
-        editing the config by hand, so the handle always stays on the monitor.
+        Dragged somewhere with no screen under it the palette could not be got
+        back without editing the config by hand, so the handle always stays
+        reachable. Against whichever monitor it is nearest, not the one it
+        started on: clamping to that one meant it could never be dragged to
+        another, which on two screens made the palette useless on one of them.
+
+        Nearest rather than the union of all of them, because a union spans
+        the gaps in a stepped or mismatched layout, and the palette could be
+        dropped into one and half vanish.
         """
         margin = 40.0
-        x = min(max(rect.x, self.monitor.x - rect.width + margin),
-                self.monitor.right - margin)
-        y = min(max(rect.y, self.monitor.y),
-                self.monitor.bottom - theme.PALETTE_GRAB)
+        screen = self._nearest(Rect(rect.x, rect.y, rect.width,
+                                    theme.PALETTE_GRAB))
+        x = min(max(rect.x, screen.x - rect.width + margin),
+                screen.right - margin)
+        y = min(max(rect.y, screen.y), screen.bottom - theme.PALETTE_GRAB)
         return Rect(x, y, rect.width, rect.height)
+
+    def _nearest(self, grab):
+        """The monitor the grab strip is most on, or closest to."""
+        best, most = self.monitors[0], 0.0
+        for screen in self.monitors:
+            across = min(grab.right, screen.right) - max(grab.x, screen.x)
+            down = min(grab.bottom, screen.bottom) - max(grab.y, screen.y)
+            overlap = max(0.0, across) * max(0.0, down)
+            if overlap > most:
+                best, most = screen, overlap
+        if most:
+            return best
+        # Nothing under it at all, which a stepped layout allows: fall back to
+        # whichever centre is closest rather than leaving it stranded.
+        centre = (grab.x + grab.width / 2, grab.y + grab.height / 2)
+        return min(self.monitors, key=lambda s: (
+            (s.x + s.width / 2 - centre[0]) ** 2
+            + (s.y + s.height / 2 - centre[1]) ** 2))
+
+    def current_monitor(self):
+        """The screen the palette is on now, for tooltips and flyouts."""
+        return self._nearest(self.grab_rect)
 
     def move_to(self, x, y):
         """Put the palette here, then rebuild everything that sat on it."""
@@ -721,11 +760,15 @@ class PaletteToolbar(Toolbar):
         box_width = width + theme.TOOLTIP_PADDING * 2
         box_height = height + theme.TOOLTIP_PADDING * 2
 
+        # The screen it is on now, not the one it started on: the palette
+        # can be dragged to another, and a tooltip clamped to the wrong one
+        # lands nowhere near its button.
+        screen = self.current_monitor()
         whole = self._whole()
         y = whole.bottom + theme.TOOLTIP_GAP
-        if y + box_height > self.monitor.bottom:
+        if y + box_height > screen.bottom:
             y = whole.y - theme.TOOLTIP_GAP - box_height
         x = button.rect.x + (button.rect.width - box_width) / 2
-        left = self.monitor.x + 4
-        right = self.monitor.right - box_width - 4
+        left = screen.x + 4
+        right = screen.right - box_width - 4
         return Rect(min(max(x, left), max(left, right)), y, box_width, box_height)

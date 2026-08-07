@@ -43,10 +43,14 @@ def canvas_point_on(monitor):
 
 def main():
     Gtk.init_check()
-    pixbuf, bounds = capture.capture_screen(Gdk.Display.get_default())
+    display = Gdk.Display.get_default()
+    pixbuf, bounds = capture.capture_screen(display)
+    # The one suite that genuinely wants the real display: it is checking that
+    # one bar appears per monitor, whatever the arrangement happens to be.
+    screens = capture.monitor_rects(display)
     check = Checker()
 
-    h = Harness(pixbuf, bounds)
+    h = Harness(pixbuf, bounds, monitors=screens)
     bars = h.overlay.toolbars.bars
     monitors = h.overlay.monitors
 
@@ -96,7 +100,7 @@ def main():
           all(bar.settings_rect is None for bar in bars))
 
     check.section("Capture works from the second monitor")
-    h = Harness(pixbuf, bounds)
+    h = Harness(pixbuf, bounds, monitors=screens)
     second = h.overlay.toolbars.bars[1]
     capture_button = next(b for b in second.buttons if b.kind == toolbar.CAPTURE)
     h.click(*centre(capture_button.rect))
@@ -107,7 +111,7 @@ def main():
           "%dx%d" % (h.result.get_width(), h.result.get_height()))
 
     check.section("hovering one bar leaves the others alone")
-    h = Harness(pixbuf, bounds)
+    h = Harness(pixbuf, bounds, monitors=screens)
     bars = h.overlay.toolbars.bars
     h.move(*centre(bars[1].buttons[0].rect))
     check("second bar is hovered", bars[1].hovered is not None)
@@ -120,7 +124,7 @@ def main():
           all(bar.hovered is None for bar in bars))
 
     check.section("only one tooltip is drawn")
-    h = Harness(pixbuf, bounds)
+    h = Harness(pixbuf, bounds, monitors=screens)
     bars = h.overlay.toolbars.bars
     h.move(*centre(bars[1].buttons[0].rect))
     said = [bar.tooltip_for(bar.hovered) for bar in bars]
@@ -128,7 +132,7 @@ def main():
           sum(1 for text in said if text) == 1, said)
 
     check.section("no drag can start under any bar")
-    h = Harness(pixbuf, bounds)
+    h = Harness(pixbuf, bounds, monitors=screens)
     second_monitor = h.overlay.monitors[1]
     h.press(second_monitor.x + 300, second_monitor.y + 10)
     h.move(second_monitor.x + 500, second_monitor.y + 300)
@@ -136,7 +140,7 @@ def main():
     check("nothing marked out from the second bar", h.region is None, h.region)
 
     check.section("dragging upward into the second bar still works")
-    h = Harness(pixbuf, bounds)
+    h = Harness(pixbuf, bounds, monitors=screens)
     second_monitor = h.overlay.monitors[1]
     start = canvas_point_on(second_monitor)
     h.press(*start)
@@ -146,7 +150,7 @@ def main():
           h.region is not None and h.region.y <= second_monitor.y + 2, h.region)
 
     check.section("the hint is repeated on every monitor")
-    h = Harness(pixbuf, bounds)
+    h = Harness(pixbuf, bounds, monitors=screens)
     surface = cairo.ImageSurface(
         cairo.FORMAT_ARGB32, int(bounds.width), int(bounds.height)
     )
