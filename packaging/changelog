@@ -1,3 +1,15 @@
+programmers-screenshot (0.24.1) noble; urgency=medium
+
+  * Fix: the floating palette could not be dragged onto another monitor. The
+    rule keeping its handle reachable was measured against whichever monitor
+    the pointer was on when the overlay opened, so on two screens the palette
+    was stuck on one of them. It is now measured against whichever monitor it
+    is nearest, so it moves freely and still cannot be lost off every screen.
+  * Its tooltips and sub-tool flyouts follow it across, rather than being
+    positioned for the monitor it started on.
+
+ -- Shubshub  Tue, 05 Aug 2026 15:30:00 +1200
+
 programmers-screenshot (0.24.0) noble; urgency=medium
 
   * The update notice and the post-upgrade changelog are now windows rather

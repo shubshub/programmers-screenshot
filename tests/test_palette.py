@@ -101,16 +101,21 @@ def main():
     check("hit testing follows", palette.button_at(*centre(moved_button.rect))
           is moved_button)
 
-    check.section("it cannot be dragged off the screen")
+    check.section("it cannot be dragged off every screen")
+    # `floating` spans two monitors, so the far edges are the outer edges of
+    # the pair -- reaching the second one is the point, not a failure.
     palette.move_to(-5000, -5000)
-    check("the handle is still on the left edge",
+    check("the handle is still on the leftmost",
           palette.grab_rect.right > MONITOR.x, palette.rect.x)
     check("and has not gone above the top", palette.rect.y >= MONITOR.y,
           palette.rect.y)
     palette.move_to(9000, 9000)
-    check("nor off the right", palette.rect.x < MONITOR.right, palette.rect.x)
+    check("nor off the right of the rightmost",
+          palette.rect.x < second.right, palette.rect.x)
+    check("and it did get as far as that second monitor",
+          palette.rect.x > MONITOR.right, palette.rect.x)
     check("nor below the bottom",
-          palette.rect.y <= MONITOR.bottom - theme.PALETTE_GRAB, palette.rect.y)
+          palette.rect.y <= second.bottom - theme.PALETTE_GRAB, palette.rect.y)
 
     check.section("tooltips flip above when there is no room below")
     context = _measuring_context()
@@ -188,6 +193,69 @@ def main():
     check("switching back restores a bar per monitor",
           len(h.overlay.toolbars.bars) == len(h.overlay.monitors),
           len(h.overlay.toolbars.bars))
+
+    # ------------------------------------------------------------------
+    check.section("the palette can be dragged onto another monitor")
+    # It could not: the clamp kept the grab strip on whichever monitor the
+    # pointer happened to be on when the overlay opened, so on two screens
+    # the palette was stuck on one of them. Every check here passes on a
+    # single monitor, which is exactly how that got through.
+    right = Rect(0, 0, 1920, 1080)
+    left = Rect(-1600, 40, 1600, 900)
+    pair = tb.Toolbars(build_tools(), [right, left], SettingValues(), tb.PALETTE)
+    moving = pair.palette
+    check("it starts on the monitor the pointer was on",
+          moving.current_monitor() == right, moving.current_monitor())
+
+    moving.move_to(left.x + 300, left.y + 200)
+    check("and can be dragged onto the other one",
+          moving.rect.x == left.x + 300, moving.rect.x)
+    check("which it then knows it is on",
+          moving.current_monitor() == left, moving.current_monitor())
+
+    moving.move_to(right.x + 500, right.y + 100)
+    check("and back again", moving.rect.x == right.x + 500, moving.rect.x)
+    check("knowing that too", moving.current_monitor() == right)
+
+    check.section("but still not somewhere it cannot be got back from")
+    moving.move_to(-99999, -99999)
+    check("the handle stays on the leftmost screen",
+          moving.grab_rect.right > left.x, moving.rect.x)
+    check("and not above it", moving.rect.y >= left.y, moving.rect.y)
+    moving.move_to(99999, 99999)
+    check("nor off the right of the rightmost",
+          moving.rect.x < right.right, moving.rect.x)
+    check("nor below it",
+          moving.rect.y <= right.bottom - theme.PALETTE_GRAB, moving.rect.y)
+
+    check.section("tooltips and flyouts follow it across")
+    ruler = _measuring_context()
+    moving.move_to(left.x + 100, left.y + 100)
+    tip = moving.tooltip_box(ruler, "Pen", moving.buttons[0])
+    check("a tooltip is kept on the screen it is now on",
+          left.x <= tip.x and tip.right <= left.right, (tip.x, tip.right))
+
+    # A tool button hard against the right edge of the left-hand monitor: its
+    # flyout has to open leftwards, judged against that monitor and not the
+    # one the palette started on.
+    edge = next(b for b in moving.buttons if b.kind == tb.TOOL and b.members)
+    edge.rect = Rect(left.right - 30, left.y + 100, theme.TOOL_BUTTON,
+                     theme.TOOL_BUTTON)
+    moving.open_flyout(edge)
+    _o, flyout_rect, _b = moving.flyout
+    check("and a flyout opens away from that screen's edge",
+          flyout_rect.right <= edge.rect.x, (flyout_rect.x, edge.rect.x))
+    check("staying on it", flyout_rect.x >= left.x, flyout_rect.x)
+    moving.flyout = None
+
+    check.section("a position remembered on the second monitor is restored there")
+    reopened = tb.Toolbars(build_tools(), [right, left], SettingValues(),
+                           tb.PALETTE, (left.x + 250, left.y + 150))
+    check("it comes back where it was left",
+          (reopened.palette.rect.x, reopened.palette.rect.y)
+          == (left.x + 250, left.y + 150),
+          (reopened.palette.rect.x, reopened.palette.rect.y))
+    check("on the right screen", reopened.palette.current_monitor() == left)
 
     check.section("related tools share one button")
     bar2 = tb.Toolbar(build_tools(), MONITOR, SettingValues())
