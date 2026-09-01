@@ -11,7 +11,8 @@ Depends: python3 (>= 3.8),
          gir1.2-gdkpixbuf-2.0,
          gir1.2-notify-0.7,
          xclip | wl-clipboard
-Recommends: nautilus | dolphin | nemo | thunar,
+Recommends: gir1.2-wnck-3.0,
+            nautilus | dolphin | nemo | thunar,
             gnome-session-canberra | pulseaudio-utils | pipewire-bin | alsa-utils
 Maintainer: Shubshub
 Homepage: https://github.com/shubshub/programmers-screenshot
@@ -32,4 +33,10 @@ Description: Minimal region screenshot tool for hotkey binding
  upload prompts, and nothing between the key and the overlay. Register a GNOME shortcut with --install-hotkey, or point any
  shortcut at the programmers-screenshot command.
  .
+ A shot can also be described as JSON rather than taken by hand, so a
+ script or an agent can produce documentation screenshots: a window or a
+ region, a delay, and boxes, arrows, numbered steps, labels, redactions and
+ pixelation. Off until switched on in the settings window.
+ .
  Works on GNOME under X11 and Wayland, and spans multi-monitor layouts.
+ Naming a window with --window needs X11 and gir1.2-wnck-3.0.

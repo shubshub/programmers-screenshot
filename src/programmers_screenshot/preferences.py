@@ -35,6 +35,11 @@ DEFAULTS = {
     # network call the program makes, and it should not start making it
     # because someone pressed Print Screen.
     "updates": False,
+    # Let --region and --recipe take a shot with nobody watching. Off until
+    # asked, for the same reason as updates and more so: a person pressing
+    # Print Screen knows what is on their screen, and something running a
+    # recipe does not.
+    "scripted": False,
 }
 
 
@@ -83,6 +88,13 @@ def build(values):
     floating = Gtk.CheckButton(label="Floating toolbar you can drag around")
     floating.set_active(values.get("toolbar") == PALETTE)
 
+    scripted = Gtk.CheckButton(label="Let a recipe drive captures")
+    scripted.set_tooltip_text(
+        "Allows --region and --recipe, so a script or an agent can take an "
+        "annotated shot with nobody at the keyboard. See --recipe-help."
+    )
+    scripted.set_active(bool(values.get("scripted")))
+
     updates = Gtk.CheckButton(label="Check GitHub for new versions")
     updates.set_tooltip_text(
         "Asks github.com once a day, after a capture. Nothing else is sent."
@@ -111,8 +123,9 @@ def build(values):
     grid.attach(Gtk.Separator(), 0, 2, 2, 1)
     grid.attach(floating, 0, 3, 2, 1)
     grid.attach(updates, 0, 4, 2, 1)
+    grid.attach(scripted, 0, 5, 2, 1)
     dialog.get_content_area().add(grid)
-    return dialog, toggle, chooser, floating, updates
+    return dialog, toggle, chooser, floating, updates, scripted
 
 
 def edit():
@@ -123,7 +136,7 @@ def edit():
     Overlay._edit_preferences for why both matter.
     """
     values = load()
-    dialog, toggle, chooser, floating, updates = build(values)
+    dialog, toggle, chooser, floating, updates, scripted = build(values)
 
     dialog.show_all()
     dialog.run()
@@ -135,6 +148,7 @@ def edit():
         "directory": chooser.get_filename() or values["directory"],
         "toolbar": PALETTE if floating.get_active() else BAR,
         "updates": updates.get_active(),
+        "scripted": scripted.get_active(),
     })
     dialog.destroy()
     save(chosen)
