@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.24.1_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.25.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.24.1_all.deb
+sudo apt install ./dist/programmers-screenshot_0.25.0_all.deb
 ```
 
 ## Bind it to a key
@@ -119,11 +119,22 @@ square, the rectangle too, and lines and arrows snap to 45° angles.
 -f, --full              capture the whole screen immediately, no overlay
 -o, --output FILE       write the PNG to FILE
 -d, --directory DIR     save into DIR instead of ~/Pictures/Screenshots
+    --window TITLE      capture that window, even if buried
+    --input FILE        annotate this image instead of capturing
+    --origin X,Y        measure coordinates from there, not from the corner
+    --scale FACTOR      picture pixels per one of yours
+    --list-windows      list the windows --window can name
+    --region X,Y,W,H    capture that area, no overlay
+    --delay SECONDS     wait before the screen is read
+    --recipe FILE       take the shot a JSON recipe describes ("-" is stdin)
+    --recipe-help       print what a recipe can describe, and exit
     --no-clipboard      don't touch the clipboard
     --no-save           clipboard only, no file
     --no-sound          don't play the shutter sound
     --install-hotkey [ACCEL]
     --uninstall-hotkey
+    --install-skill     teach Claude Code sessions that this exists
+    --uninstall-skill
 ```
 
 The saved path is printed to stdout, so it pipes:
@@ -133,6 +144,93 @@ scp "$(programmers-screenshot)" server:/tmp/
 ```
 
 See `man programmers-screenshot` for the full details.
+
+## Recipes
+
+A shot can be *described* instead of taken by hand, so something other than a
+person can produce one — the documentation screenshots in this README, for
+instance, without anybody dragging a rectangle:
+
+```bash
+programmers-screenshot --recipe - -o docs/img/save.png --no-clipboard <<'EOF'
+{
+  "region": [100, 100, 900, 500],
+  "annotate": [
+    {"box":   [150, 150, 350, 150], "colour": "red", "width": 4},
+    {"arrow": [[650, 420], [520, 310]]},
+    {"step":  [200, 200]},
+    {"label": [200, 480], "text": "Press Save", "background": true},
+    {"redact":[160, 330, 300, 40]}
+  ]
+}
+EOF
+```
+
+Box, ellipse, line, arrow, step, label, redact and pixelate are all
+expressible, in the colours and sizes the toolbar offers. Coordinates are
+logical pixels from the top left of whatever is being captured, never relative
+to the region.
+
+`--window "Google Chrome"` captures one window *whatever is stacked on top of
+it* — nothing is raised or focused, because under a compositor every window is
+drawn to an offscreen pixmap of its own.
+
+For a browser **tab**, use `--input` instead. Nothing outside a browser can
+address a tab — a tab is not a window, and only the front tab of a window is
+being drawn at all, so a background tab has no pixels on the screen to
+photograph. Naming a window is only ever a guess about which tab is in front.
+A browser can capture the tab it means, so let it, and annotate what it gives
+you:
+
+```bash
+programmers-screenshot --input tab.png --scale 0.7221 -o shot.png --recipe -
+```
+
+`--scale` is the picture's width over `window.innerWidth`, and with it every
+coordinate in the recipe is the page's own, straight out of
+`getBoundingClientRect()`, with nothing to convert.
+
+`--window` is X11 only and wants `gir1.2-wnck-3.0`; `--input` needs neither.
+
+`--recipe-help` prints the whole reference, generated from the parser's own
+table so it cannot go stale, including how to map coordinates out of a browser
+onto the screen. That is the thing to read, or to hand to a program, before
+writing a recipe.
+
+Nothing is drawn until the whole recipe has been understood, so a mistake in
+the last arrow does not leave the first three baked into a half-finished
+image. The message names the entry and the exit status is 2.
+
+**Off until you switch it on**, in the settings window, for the same reason
+the update check is. A person pressing <kbd>Print</kbd> knows what is on their
+screen; something running a recipe does not, and may catch a password manager,
+a private message or a token in a terminal and then write it to a file. Prefer
+a named `--region` to the whole screen, and redact anything sensitive in the
+same recipe — a redaction replaces the pixels, so nothing of the original
+reaches the PNG. The shutter still sounds, which is how the person at the desk
+knows it happened.
+
+It reads the real screen, so it wants a live desktop session on the same
+machine. Over plain ssh, in a container or in CI there is no display and it
+exits 1.
+
+### Telling Claude Code about it
+
+A recipe is no use to something that has never heard of it, and a session
+working in another project has no reason to guess this program exists:
+
+```bash
+programmers-screenshot --install-skill
+```
+
+That writes `~/.claude/skills/programmers-screenshot/SKILL.md`, after which any
+session offers it when a screenshot is wanted. The skill is deliberately thin —
+the three ways in, how a browser tab is done, and *run `--recipe-help`* — so
+that everything which could drift lives in the generated reference rather than
+in a copy of it ageing on disk. `--uninstall-skill` takes it back.
+
+Installing the skill does not switch recipes on. That stays a decision made in
+the settings window.
 
 ## How it works
 
@@ -188,6 +286,7 @@ src/programmers_screenshot/
     overlay.py                    the modal window: events, drawing, grabs
     toolbar.py                    one bar per monitor; rows, hit testing, drawing
     scene.py                      region + annotations, and undo/redo
+    recipe.py                     a shot described as JSON, for scripts
     actions.py                    the undoable changes a tool can make
     settings.py                   Setting types and their shared values
     tools/

@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-08-02" "programmers-screenshot 0.24.1" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-09-02" "programmers-screenshot 0.25.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -201,6 +201,70 @@ Write the PNG to \fIFILE\fR instead of a timestamped name.
 Save into \fIDIR\fR instead of the default directory, overriding the folder
 chosen in the settings window.
 .TP
+.BR \-\-window " " \fITITLE\fR
+Capture the window whose title contains \fITITLE\fR, whatever is stacked on
+top of it. Nothing is raised or focused: under a compositor each window is
+drawn to an offscreen pixmap of its own, so a completely buried window can be
+photographed without disturbing it, and nothing lying over it gets into the
+picture. Coordinates are then relative to that window's own top left corner.
+The title must pick out one window; if it matches several, the message lists
+them. X11 only, and needs libwnck (\fBgir1.2\-wnck\-3.0\fR). Off until
+enabled; see
+.BR RECIPES .
+.TP
+.BR \-\-input " " \fIFILE\fR
+Annotate \fIFILE\fR instead of capturing anything. Coordinates are then
+measured from the top left of that picture.
+.IP
+This is how a browser \fItab\fR gets annotated. Nothing outside a browser can
+address a tab: a tab is not a window, and only the front tab of a window is
+being drawn at all, so a background tab has no pixels on the screen to
+photograph. Naming a window, or having a page mark itself somehow, is only ever
+a guess about which tab is in front, and it is wrong the moment somebody
+switches tabs. A browser can capture the tab it means; let it, and annotate
+what it produces.
+.TP
+.BR \-\-scale " " \fIFACTOR\fR
+The picture holds this many of its own pixels per one of yours. A browser
+screenshot 1242 pixels wide of a 1720 pixel viewport is \fB\-\-scale
+0.7221\fR, and then every coordinate can be the page's own, straight out of
+.BR getBoundingClientRect() .
+Positions and sizes are scaled; how a mark is drawn is not, so a width of 4 is
+4 pixels of the picture either way.
+.TP
+.BR \-\-origin " " \fIX,Y\fR
+Measure every coordinate from that point instead of from the corner of what
+was captured.
+.TP
+.B \-\-list\-windows
+Print the windows
+.B \-\-window
+can name, with their sizes and positions, and exit.
+.TP
+.BR \-\-region " " \fIX,Y,W,H\fR
+Capture that area and nothing else, without ever showing the overlay.
+Coordinates are logical pixels from the top left of whatever is being
+captured: the named window with
+.BR \-\-window ,
+or the whole virtual screen without it. Off until enabled; see
+.BR RECIPES .
+.TP
+.BR \-\-delay " " \fISECONDS\fR
+Wait before the screen is read, so a menu or a hover state can be set up
+first. Works with the overlay too: the delay happens before the screen is
+frozen, so what you arrange during it is what you get to draw on.
+.TP
+.BR \-\-recipe " " \fIFILE\fR
+Take the shot described by a JSON recipe, with no overlay and nobody at the
+keyboard. \fB\-\fR reads it from standard input. See
+.BR RECIPES .
+.TP
+.B \-\-recipe\-help
+Print the whole of what a recipe can describe \- every mark, every parameter,
+the coordinate frame and a worked example \- and exit. This is the reference,
+generated from the parser's own table, and it is what to read (or hand to a
+program) before writing one. Needs no display.
+.TP
 .B \-\-no\-clipboard
 Do not touch the clipboard.
 .TP
@@ -218,14 +282,6 @@ GTK accelerator string and defaults to \fBPrint\fR.
 GNOME holds Print for its own screenshot UI, and a custom shortcut does not
 reliably win while it does, so this switches the built-in off and reports
 what it took. The old value is written to
-.I ~/.config/programmers-screenshot/preferences.json
-What the settings window stores.
-.TP
-.I ~/.config/programmers-screenshot/state.json
-Bookkeeping the program keeps for itself: when it last asked about releases,
-which version it last mentioned, which version last ran. Kept apart from your
-settings so neither has to be edited around the other.
-.TP
 .I ~/.config/programmers-screenshot/displaced.json
 and
 .B \-\-uninstall\-hotkey
@@ -234,6 +290,19 @@ puts it back. An accelerator nobody holds disturbs nothing.
 .B \-\-uninstall\-hotkey
 Remove the shortcut registered by \fB\-\-install\-hotkey\fR, and restore any
 GNOME binding it displaced.
+.TP
+.B \-\-install\-skill
+Write a Claude Code skill to
+.IR ~/.claude/skills/programmers\-screenshot/SKILL.md ,
+so that a session in any project knows this command exists and how to drive
+it. Deliberately thin: it says what the three ways in are, how a browser tab
+is done, and to run
+.BR \-\-recipe\-help ,
+which is generated and so cannot go stale. Writing it does not switch recipes
+on \- that is still a decision made in the settings window.
+.TP
+.B \-\-uninstall\-skill
+Remove that file, and the directory it sits in if nothing else was put there.
 .TP
 .B \-\-version
 Print the version and exit.
@@ -246,7 +315,52 @@ A screenshot was captured and delivered.
 The capture was cancelled, or the screen could not be read.
 .TP
 .B 2
-The options given were contradictory.
+The options given were contradictory, or a recipe could not be understood \-
+in which case nothing was captured and nothing was drawn.
+.SH RECIPES
+A screenshot can be described rather than taken by hand, so that something
+other than a person can produce one: a window or a picture to annotate, an
+origin and a scale, a region, a delay, an output path and a list of marks, as
+JSON.
+.PP
+.EX
+{"region": [100, 100, 900, 500],
+ "annotate": [{"box": [150, 150, 350, 150], "colour": "red"},
+              {"arrow": [[650, 420], [520, 310]]},
+              {"step": [200, 200]},
+              {"redact": [160, 330, 300, 40]}]}
+.EE
+.PP
+A box, an ellipse, a line, an arrow, a numbered step, a label, a redaction
+bar and a pixelated patch are all expressible, in the same colours and sizes
+the toolbar offers. Coordinates are logical pixels from the top left of what
+is being captured \- the named window, or the whole virtual screen \- and
+that goes for the marks as well as the region, and
+.B \-\-origin
+and
+.B \-\-scale
+shift and stretch that frame when the numbers to hand are in another one.
+Nothing is ever relative to the region.
+.PP
+.B \-\-recipe\-help
+prints the full reference, including how to map coordinates out of a browser
+onto the screen. Nothing is drawn until the whole recipe has been understood,
+so a mistake in the last arrow does not leave the first three baked into a
+half-finished image; the message names the entry, and the exit status is 2.
+.PP
+Off until switched on, in the settings window, for the same reason the update
+check is: a person pressing Print Screen knows what is on their screen, and
+something running a recipe does not. It may catch a password manager, a
+private message or a token in a terminal, and then write it to a file.
+Prefer a named
+.B \-\-region
+to the whole screen, and redact anything sensitive in the same recipe \- a
+redaction replaces the pixels, so nothing of the original reaches the PNG.
+The shutter still sounds, which is how the person at the desk knows.
+.PP
+It reads the real screen, so it needs a live desktop session on the same
+machine. Over plain ssh, in a container or in CI there is no display and it
+exits 1.
 .SH UPDATES
 Off by default, and the only time the program touches the network. Switch it
 on in the settings window and it asks github.com once a day, after a capture
@@ -278,6 +392,9 @@ settings so neither has to be edited around the other.
 .TP
 .I ~/.config/programmers-screenshot/displaced.json
 GNOME shortcuts switched off to free the hotkey, kept so they can be restored.
+.TP
+.I ~/.claude/skills/programmers-screenshot/SKILL.md
+Written by \fB\-\-install\-skill\fR, and removed by \fB\-\-uninstall\-skill\fR.
 .SH NOTES
 Under X11 the screen is captured directly from the root window. Under Wayland
 it goes through the

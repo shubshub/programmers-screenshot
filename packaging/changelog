@@ -1,191 +1,38 @@
-programmers-screenshot (0.24.1) noble; urgency=medium
+programmers-screenshot (0.25.0) noble; urgency=medium
 
-  * Fix: the floating palette could not be dragged onto another monitor. The
-    rule keeping its handle reachable was measured against whichever monitor
-    the pointer was on when the overlay opened, so on two screens the palette
-    was stuck on one of them. It is now measured against whichever monitor it
-    is nearest, so it moves freely and still cannot be lost off every screen.
-  * Its tooltips and sub-tool flyouts follow it across, rather than being
-    positioned for the monitor it started on.
+  * A screenshot can now be described rather than taken by hand, so that
+    something other than a person can produce one. --recipe takes JSON naming
+    a region, a delay, an output path and a list of marks: boxes, ellipses,
+    lines, arrows, numbered step badges, labels, redaction bars and
+    pixelation, in the colours and sizes the toolbar already offers. Nothing
+    is drawn until the whole recipe has been understood, so a mistake in the
+    last arrow does not leave the first three baked into a half-finished
+    image; the message names the entry and the exit status is 2.
+  * --recipe-help prints the whole reference, generated from the parser's own
+    table so it cannot go stale, and needs no display.
+  * --region X,Y,W,H captures an area with no overlay, and --delay N waits
+    before the screen is read, so a menu or a hover state can be set up first.
+    The delay works with the overlay too.
+  * --window TITLE captures one window whatever is stacked on top of it.
+    Nothing is raised and nothing is focused: under a compositor every window
+    is drawn to an offscreen pixmap of its own, so a completely buried window
+    can be photographed without disturbing it, and whatever is lying over it
+    stays out of the picture. --list-windows says what can be named. X11 only,
+    and it wants libwnck.
+  * --input FILE annotates a picture something else took, with --scale for the
+    size it came out at and --origin to move where coordinates start. This is
+    how a browser tab is done: nothing outside a browser can address a tab, so
+    the browser captures the tab it means and this annotates the result, with
+    every coordinate the page's own.
+  * --install-skill writes a Claude Code skill, so that a session in any
+    project knows the command exists and how to drive it. --uninstall-skill
+    takes it back.
+  * All of it is off until switched on, in the settings window, for the same
+    reason the update check is: a person pressing Print Screen knows what is
+    on their screen and a script does not. Annotating a picture with --input
+    is exempt, since it reads no screen at all.
+  * Fix: a stray copy of the file list had been pasted into the middle of the
+    --install-hotkey paragraph of the man page, splitting a sentence in two.
 
- -- Shubshub  Tue, 05 Aug 2026 15:30:00 +1200
+ -- Shubshub  Wed, 02 Sep 2026 14:20:00 +1200
 
-programmers-screenshot (0.24.0) noble; urgency=medium
-
-  * The update notice and the post-upgrade changelog are now windows rather
-    than desktop notifications. A notification vanishes while you are looking
-    somewhere else, and truncates a changelog to a couple of lines; a window
-    waits to be dismissed and scrolls.
-  * The whole changelog entry is shown, rather than the first three bullets
-    that fitted in a notification.
-  * The package description no longer claims there are no dialogs. There have
-    been since the settings window, and there are more now.
-
- -- Shubshub  Tue, 05 Aug 2026 13:10:00 +1200
-
-programmers-screenshot (0.23.0) noble; urgency=medium
-
-  * Fix: the eraser ground to a halt after a few seconds of dragging, and
-    recovered only when you let go. Two things grew with the length of a
-    stroke and multiplied: the whole swept path was repainted every frame,
-    and every hole made so far was punched into it again. Only the part that
-    moved is repainted now, and only holes that could change a pixel in it
-    are punched. Cost per frame no longer grows with the stroke.
-  * Holes are also spaced by about the eraser's radius rather than every 4
-    pixels. They were stacked four deep for no visual gain, and holding the
-    eraser still used to add another on every mouse event.
-
- -- Shubshub  Tue, 05 Aug 2026 11:40:00 +1200
-
-programmers-screenshot (0.22.0) noble; urgency=medium
-
-  * Optional update check. Switch it on in the settings window and the tool
-    asks github.com once a day whether a newer release exists, and shows a
-    notification with a button to the release notes if so. Off by default:
-    this is the only network call the program makes.
-  * The check runs in a process of its own after a capture has finished, so
-    nothing can put a network timeout between the keypress and the overlay.
-    It never downloads or installs anything.
-  * Silent whenever there is nothing to say: up to date, offline, rate
-    limited, or a reply that does not parse.
-  * The first run after an upgrade now reports what changed, read from the
-    changelog already shipped in the package. No network. Nothing on a first
-    install, on a downgrade, or twice for the same version.
-  * Bookkeeping moved to its own state.json, so machine state is not mixed
-    into the preferences you edit.
-
- -- Shubshub  Tue, 05 Aug 2026 09:15:00 +1200
-
-programmers-screenshot (0.21.0) noble; urgency=medium
-
-  * Related tools now share a button. Pen and Highlighter sit together under
-    Ink; Black Bar and Pixelate under Redact. Eleven buttons become nine,
-    which on the floating palette is two rows instead of three.
-  * The redaction tool is now called Black Bar, since Redact is the name of
-    the pair it belongs to.
-  * A group button shows whichever member you last picked and remembers it,
-    so the common case stays a single click; the corner wedge opens the rest.
-  * Fix: the test suite read the real preferences file, so whatever was last
-    chosen in the settings window changed how the tests behaved. It now uses
-    a config of its own.
-
- -- Shubshub  Tue, 04 Aug 2026 16:05:00 +1200
-
-programmers-screenshot (0.20.0) noble; urgency=medium
-
-  * The toolbar can now be a floating palette you drag around instead of a
-    bar across the top of every monitor. Switch in the settings window; it
-    takes effect at once and remembers where you put it. Bar remains the
-    default and is unchanged.
-  * One palette rather than one per monitor: you put it where you want it,
-    and copies on the other screens would be clutter you could not remove.
-  * Sub-tool flyouts. A tool with variants wears a wedge in the corner of its
-    button; clicking it opens the alternatives beside the button, on
-    whichever side has room. The line tool's line, rectangle, circle and
-    arrow have moved there from the settings row, and the button now shows
-    which of them is selected.
-  * The pixelate test no longer captures the live screen. It compared how
-    many colours survive coarse against fine blocks, which was a meaningless
-    comparison whenever the desktop happened to be a flat expanse, and made
-    the suite fail at random.
-
- -- Shubshub  Tue, 04 Aug 2026 14:20:00 +1200
-
-programmers-screenshot (0.19.0) noble; urgency=medium
-
-  * New Eraser tool: drag across the canvas to rub out the parts of any mark
-    you sweep through -- half a pen stroke, a bite out of a rectangle, a hole
-    in a pixelate block or a redaction bar. A plain click with no drag
-    removes the whole mark instead.
-  * The holes are kept as geometry rather than as a bitmap mask, so they are
-    as sharp in the saved PNG as they are on screen, whatever the display
-    scale.
-  * The rubbing out happens under the pointer as you drag, not when you let
-    go.
-  * One drag undoes as a single step, however many marks it crossed.
-  * Note that rubbing out part of a redaction bar uncovers what it was
-    hiding.
-  * Erasing a numbered step badge renumbers the ones after it, so the
-    sequence stays 1..n and the next badge continues instead of repeating a
-    number already in use.
-
- -- Shubshub  Tue, 04 Aug 2026 10:30:00 +1200
-
-programmers-screenshot (0.18.2) noble; urgency=medium
-
-  * Fix: on a HiDPI display the overlay showed a hugely magnified crop of the
-    top-left corner instead of the desktop. The capture arrives in physical
-    pixels and the overlay draws in logical ones, and the on-screen paint did
-    not account for the difference. The undimmed selection region had the
-    same fault. Saved PNGs were never affected -- they were always rendered
-    with the correct arithmetic -- but the overlay was unusable, since you
-    could not see what you were selecting.
-
- -- Shubshub  Mon, 03 Aug 2026 20:15:00 +1200
-
-programmers-screenshot (0.18.1) noble; urgency=medium
-
-  * Fix: a setting changed in the settings window did not affect the capture
-    you were holding, only the next one. Preferences were read once at
-    startup, before the overlay opened, so switching saving off still wrote
-    the screenshot to disk that first time. They are now read after the
-    overlay closes, which is when the window has finished writing them.
-
- -- Shubshub  Mon, 03 Aug 2026 19:30:00 +1200
-
-programmers-screenshot (0.18.0) noble; urgency=medium
-
-  * A settings button on the toolbar, opening a window for preferences that
-    outlive a session. The first is whether captures are saved to a folder,
-    and which folder. Stored in
-    ~/.config/programmers-screenshot/preferences.json.
-  * What the window stores is a default. An explicit --directory, --no-save
-    or -o on the command line still wins.
-  * --version now says where it loaded from, as well as the number. One
-    version can cover several builds, since a fix between releases does not
-    bump it, so the number alone cannot tell you which code is running.
-  * build.sh --install now passes --reinstall. Without it apt saw the same
-    version already installed and did nothing, leaving you running the
-    previous build.
-
- -- Shubshub  Mon, 03 Aug 2026 18:05:00 +1200
-
-programmers-screenshot (0.17.1) noble; urgency=medium
-
-  * Saved screenshots are now mode 0600 rather than whatever the umask
-    allowed, which was world-readable under the default 022. Captures
-    routinely contain tokens and should not widen with -o or -d. They are
-    written under a private name and renamed into place, so the image is
-    never briefly visible at a readable mode and no half-written PNG
-    appears under the final name. This is a behaviour change for anyone
-    writing into a directory they then share.
-  * Saving no longer follows a symlink sitting at the destination. Screenshot
-    names are timestamps and so are guessable, which meant that when saving
-    into a world-writable directory another user could pre-plant a link under
-    the name about to be used and have the PNG written straight through it,
-    over a file of their choosing that you own. The link is now replaced.
-  * The Wayland capture path no longer leaves a copy of the raw screen in
-    /tmp when GNOME Shell writes to a path other than the one it was given.
-    The stray file was the unannotated screen, so it outlived any redaction
-    drawn on the capture that was kept.
-
- -- Shubshub  Mon, 03 Aug 2026 16:50:00 +1200
-
-programmers-screenshot (0.17.0) noble; urgency=medium
-
-  * First release.
-  * Region screenshot tool bound to a hotkey, defaulting to Print. Freezes
-    the screen, puts a toolbar on every monitor, and captures on demand.
-  * Ten tools: region, freehand pen, highlighter, line/rectangle/circle/
-    arrow, measure, redaction, pixelation, colour picker, numbered steps
-    and text. Adding another is one file plus a registry line.
-  * Undo and redo over everything, including setting the capture region.
-  * Result goes to the clipboard and to ~/Pictures/Screenshots, with the
-    path on standard output so it composes in scripts.
-  * Shutter sound, and a notification offering to open the image or show it
-    in its folder.
-  * Hover tooltips on every toolbar button.
-  * Installing the hotkey frees whatever GNOME binding holds the key and
-    restores it on uninstall.
-
- -- Shubshub  Mon, 03 Aug 2026 15:20:00 +1200

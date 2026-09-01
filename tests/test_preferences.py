@@ -124,9 +124,10 @@ def main():
 
         check.section("the folder chooser follows the toggle")
         if Gtk.init_check()[0]:
-            dialog, toggle, chooser, floating, updates = preferences.build(
-                {"save": True, "directory": home, "toolbar": preferences.BAR,
-                 "updates": False})
+            dialog, toggle, chooser, floating, updates, scripted = (
+                preferences.build(
+                    {"save": True, "directory": home,
+                     "toolbar": preferences.BAR, "updates": False}))
             check("enabled while saving is on", chooser.get_sensitive())
             toggle.set_active(False)
             check("greyed out when switched off", not chooser.get_sensitive())
@@ -138,6 +139,8 @@ def main():
                   not floating.get_active())
             check("as is the update check, which is the only network call",
                   not updates.get_active())
+            check("and recipes, which let something else point this at a screen",
+                  not scripted.get_active())
             dialog.destroy()
         else:
             check("no display, so the window was not built", False,
