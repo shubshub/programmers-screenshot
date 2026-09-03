@@ -89,42 +89,69 @@ codes. What is below is only what to know before reading it.
 - `--window TITLE` - one window, even one completely buried under others.
   Nothing is raised and nothing on top of it gets into the picture.
   `--list-windows` shows what can be named. X11 only.
-- `--input FILE --viewport WIDTH` - annotate a picture something else took,
-  which is how a browser tab is done.
+- `--input FILE --viewport WIDTH --dpr RATIO` - annotate a picture something
+  else took, which is how a browser tab is done.
 
 ## A browser tab, with Claude in Chrome
 
-Two tool calls, both from the session that has the Chrome tools connected
-(`claude --chrome`, or `/chrome` in a running session). Never shell out to
-`claude --chrome -p` for the picture: a nested session can only hand back
-prose, so the path and every number has to be parsed out of a paragraph, and
-it takes minutes to do what these two take seconds.
+Two tool calls, from the session that has the Chrome tools connected
+(`claude --chrome`; `/chrome` opens the extension's settings). About two
+seconds a shot.
 
-1. One `browser_batch`: a `javascript_tool` call returning `window.innerWidth`
-   and the `getBoundingClientRect()` of each element wanted, then `computer`
-   with `action: "screenshot"` and `save_to_disk: true`. The result names the
-   file: `/tmp/claude-chrome-screenshots-*/screenshot-*.jpg`. A JPEG is fine.
-   A background tab works; nothing has to be brought to the front.
+1. One `browser_batch`: a `javascript_tool` call returning `innerWidth`,
+   `devicePixelRatio` and the `getBoundingClientRect()` of each element wanted,
+   then `computer` with `action: "screenshot"` and `save_to_disk: true`. The
+   result names the file, `/tmp/claude-chrome-screenshots-*/screenshot-*.jpg`,
+   and its size. A JPEG is fine.
 2. One Bash call, with the rectangles used exactly as they came:
 
 ```bash
-programmers-screenshot --input <that file> --viewport <innerWidth> -o out.png --no-clipboard --recipe - <<'EOF'
-{"annotate": [{"box": [344, 198, 1032, 29], "colour": "red", "width": 3},
-              {"step": [332, 212]}]}
+programmers-screenshot --input <that file> --viewport <innerWidth> --dpr <devicePixelRatio> -o out.png --no-clipboard --recipe - <<'EOF'
+{"region": [0, 60, 1000, 640],
+ "annotate": [{"box": [4, 84, 790, 202], "colour": "red", "width": 3},
+              {"step": [20, 100]}]}
 EOF
 ```
 
-`--viewport` is `window.innerWidth`; the scale is worked out from the picture's
-own width, so nothing has to open the file to measure it. Ask the page for its
-rectangles in the same batch as the screenshot, so the two cannot describe
-different scroll positions. `--input` is quiet: no shutter, no notification,
-because no screen was read.
+The scale is worked out from the picture's own width, the viewport and the
+pixel ratio, so nothing has to open the file to measure it. Pass all three: at
+a page zoom other than 100% the saved picture is cropped to 1/dpr of the
+viewport, and the width alone lands every mark short by that much. Never
+estimate a scale by eye from the picture; two different wrong factors each
+looked right once. A `region` trims a sticky header. `--input` is quiet: no
+shutter, no notification, because no screen was read.
 
-Why `--input` and never `--window`: a tab is not a window, and only a
-window's front tab is being drawn at all, so a background tab has no pixels on
-the screen to photograph. Naming a window only guesses which tab is in front,
-is wrong the moment somebody switches tabs, and needs the recipes switch,
-which `--input` does not.
+What goes wrong, and what to do instead:
+
+- Do not scroll in the capture batch. A capture straight after a scroll can be
+  a stale frame of an earlier position, while the rectangles from the same
+  batch describe the final one. If the target is off-screen, rearrange the DOM
+  so it is on-screen at `scrollTo(0, 0)` - hide the other rows, move the
+  container to the top - then `computer` `wait` 2 seconds, then capture. A
+  `Page.captureScreenshot` timeout follows a big DOM change; wait 2 seconds
+  and retry once.
+- No async wrapper in `javascript_tool`: `(async () => ...)()` comes back as
+  `{}`. Top-level `await` works, and synchronous code is safest. Return an
+  object or a `JSON.stringify` string.
+- A background tab is fine on a light page. On a heavy one it gave blank saves
+  and timeouts; use `tabs_create_mcp`, which is active by default, and wait 2
+  seconds after navigating.
+- If this session was not started with `--chrome` it has no Chrome tools, and
+  the fallback is a nested `claude --chrome -p`, at about 75 seconds a shot.
+  Script it completely - fixed JavaScript, no page clicks, no scrolling, a
+  one-line JSON reply naming the file - and let it decide nothing; a sub-agent
+  left to scroll and look is what takes an hour. Name the tools exactly in
+  `--allowedTools`: `mcp__claude-in-chrome__tabs_create_mcp`,
+  `mcp__claude-in-chrome__navigate`, `mcp__claude-in-chrome__javascript_tool`
+  (not `javascript`), `mcp__claude-in-chrome__computer`,
+  `mcp__claude-in-chrome__browser_batch`, `mcp__claude-in-chrome__tabs_context_mcp`.
+
+Why `--input` and not `--window`: a tab is not a window, and only a window's
+front tab is being drawn at all, so a background tab has no pixels on the
+screen to photograph. `--window "... - Google Chrome"` does capture the whole
+window perfectly, so it is a fair fallback when the tab can be kept in front
+for two seconds; but the front tab changes under you, and it needs the recipes
+switch, which `--input` does not.
 
 ## Before it will run
 

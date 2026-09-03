@@ -129,6 +129,7 @@ def main():
     refused(check, "an origin that is not a point", '{"origin": [1]}', "origin")
     refused(check, "a scale of zero", '{"scale": 0}', "scale")
     refused(check, "a viewport of zero", '{"viewport": 0}', "viewport")
+    refused(check, "a dpr of zero", '{"dpr": 0}', "dpr")
     refused(check, "annotate that is not a list", '{"annotate": {}}', "annotate")
 
     check.section("a bad mark names its own position in the list")
@@ -225,6 +226,7 @@ def main():
     check("it says a display is needed", "no display" in described)
     check("and that it is off until switched on", "Off until switched on" in described)
     check("it names the Chrome handoff", "save_to_disk" in described)
+    check("and the pixel ratio", "devicePixelRatio" in described)
 
     check.section("the flags that reach it")
     parsed = cli.build_parser().parse_args(
@@ -253,6 +255,7 @@ def main():
               cli.reads_the_screen(parse(*flags)) == wanted)
     check("--delay is a number", parsed.delay == 2.0)
     check("--viewport is carried", parse("--viewport", "1720").viewport == 1720.0)
+    check("--dpr is carried", parse("--dpr", "1.25").dpr == 1.25)
     check("--recipe is carried", parsed.recipe == "-")
     check("a recipe counts as scripted", cli.scripted(parsed))
     check("an ordinary run does not",
@@ -289,6 +292,37 @@ def main():
         check("a viewport of zero is refused", False, "accepted")
     except recipe.RecipeError as error:
         check("a viewport of zero is refused", "viewport" in str(error), error)
+
+    check.section("a page zoom crops the save, and --dpr accounts for it")
+    # The post-mortem's capture: a 994 px wide save of a 1376 px viewport at
+    # a page zoom of 125%. Two dots the page drew at known points measured
+    # 0.9024 x 0.9027 picture px per logical px with no offset, so the save is
+    # the top-left 1/dpr of the viewport, and width / viewport alone is a
+    # quarter short. The expected rectangle below is where the dots put it.
+    saved = Rect(0, 0, 994, 762)
+    zoomed = cli.frame_for(
+        saved, parse("--input", "x.jpg", "--viewport", "1376", "--dpr", "1.25")
+    )
+    check("the scale is width x dpr over viewport",
+          abs(zoomed.scale - 994 * 1.25 / 1376.0) < 1e-9, zoomed.scale)
+    stand = Stand(saved)
+    recipe.annotate({"annotate": [{"box": [4, 84, 790, 202]}]}, stand, zoomed)
+    box = stand.scene.items[0]
+    landed = tuple(round(v) for v in (
+        box.start[0], box.start[1], box.end[0] - box.start[0], box.end[1] - box.start[1]
+    ))
+    check("the row lands where the calibration dots say, within a pixel",
+          all(abs(a - b) <= 1 for a, b in zip(landed, (4, 76, 713, 182))), landed)
+    check("without --dpr the arithmetic is what it was",
+          cli.frame_for(saved, parse("--viewport", "1376")).scale == 994 / 1376.0)
+    check("--scale still wins over both",
+          cli.frame_for(saved, parse("--scale", "0.5", "--viewport", "1376",
+                                     "--dpr", "1.25")).scale == 0.5)
+    try:
+        cli.frame_for(saved, parse("--viewport", "1376", "--dpr", "0"))
+        check("a dpr of zero is refused", False, "accepted")
+    except recipe.RecipeError as error:
+        check("a dpr of zero is refused", "dpr" in str(error), error)
 
     check.section("--input is quiet: nothing was photographed")
     heard = []

@@ -37,8 +37,8 @@ class RecipeError(ValueError):
 
 
 #: What a recipe may say at the top level.
-KEYS = ("input", "window", "origin", "scale", "viewport", "region", "delay",
-        "output", "annotate")
+KEYS = ("input", "window", "origin", "scale", "viewport", "dpr", "region",
+        "delay", "output", "annotate")
 
 #: What an entry may carry besides the shape itself. One set for all of them:
 #: the mistake worth catching is a misspelling, not a width on a step badge.
@@ -252,7 +252,7 @@ def parse(text):
         raise RecipeError("delay: expected seconds, got %s" % json.dumps(delay))
     if spec.get("origin") is not None:
         numbers(spec["origin"], 2, "origin")
-    for key in ("scale", "viewport"):
+    for key in ("scale", "viewport", "dpr"):
         value = spec.get(key)
         if value is not None and (
             isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0
@@ -392,6 +392,10 @@ COORDINATES
     --viewport WIDTH  or say the picture shows a page this many logical pixels
                       wide (window.innerWidth) and the scale is worked out
                       from the picture's own width; --scale wins if both given
+    --dpr FACTOR      window.devicePixelRatio, default 1. A Claude in Chrome
+                      save made at a page zoom other than 100%% is cropped to
+                      1/dpr of the viewport, so --viewport alone lands every
+                      mark short; with both the scale is right
 
   They move where marks land. None of them touches how marks are drawn: a
   width of 4 is 4 pixels of the picture, whatever ruler the coordinates came
@@ -407,6 +411,7 @@ RECIPE
       "origin":   [x, y],                  move where coordinates start
       "scale":    0.7221,                  picture pixels per one of yours
       "viewport": 1720,                    or the page width the picture shows
+      "dpr":      1.25,                    and its devicePixelRatio, default 1
       "region":   [x, y, width, height],   all of it if left out
       "delay":    2,                       seconds to wait before capturing
       "output":   "docs/img/save.png",     -o wins over this
@@ -449,34 +454,62 @@ WORKING FROM A BROWSER
   it means, front or not. So let it:
 
     1. the browser screenshots the tab, to a file
-    2. --input that file, with --viewport for window.innerWidth (or --scale
-       for the size it came out at)
+    2. --input that file, with --viewport for window.innerWidth and --dpr
+       for window.devicePixelRatio (or --scale, if you know it)
     3. every coordinate is then the page's own, out of
        getBoundingClientRect(), with nothing to convert
 
     {"input": "tab.jpg",
-     "viewport": 1720,
-     "region": [300, 170, 1130, 180],
-     "annotate": [{"box": [344, 198, 1032, 29]},
-                  {"step": [332, 212]}]}
+     "viewport": 1376,
+     "dpr": 1.25,
+     "region": [0, 60, 1000, 640],
+     "annotate": [{"box": [4, 84, 790, 202]},
+                  {"step": [20, 100]}]}
 
-  With Claude in Chrome that is two tool calls, both from the session that
-  has the Chrome tools connected (claude --chrome): one browser_batch holding
-  a javascript_tool call for window.innerWidth and the rectangles, then
-  computer with action "screenshot" and save_to_disk true, which names the
-  file it wrote under /tmp/claude-chrome-screenshots-*/ -- a JPEG, which is
-  fine, and of a background tab if that is the one asked for. Then one Bash
-  call running the recipe above. Do not shell out to claude --chrome -p for
-  the picture: a nested session can only hand back prose, and takes minutes
-  to do what these two take seconds.
+  Pass all three numbers. At a page zoom other than 100%% the saved picture
+  is cropped to 1/dpr of the viewport, so the width alone lands every mark
+  short by that much: at 125%% a quarter. Never estimate a scale by eye from
+  the picture; two different wrong factors each looked right once. A region
+  trims a sticky header.
 
-  Ask the page for the rectangles you want in the same breath as the
-  screenshot, so the two cannot describe different scroll positions.
+  With Claude in Chrome that is two tool calls, from the session that has
+  the Chrome tools connected (claude --chrome; /chrome opens its settings):
+  one browser_batch holding a javascript_tool call for innerWidth,
+  devicePixelRatio and the rectangles, then computer with action
+  "screenshot" and save_to_disk true, which names the file it wrote under
+  /tmp/claude-chrome-screenshots-*/ and its size -- a JPEG, which is fine.
+  Then one Bash call running the recipe above. About two seconds a shot.
+
+  What goes wrong, and what to do instead:
+
+    - do not scroll in the capture batch. A capture straight after a scroll
+      can be a stale frame of an earlier position while the rectangles from
+      the same batch describe the final one. Rearrange the DOM so the target
+      is on screen at scrollTo(0, 0) -- hide the other rows, move the
+      container to the top -- then computer "wait" 2 seconds, then capture.
+      A Page.captureScreenshot timeout follows a big DOM change; wait 2
+      seconds and retry once
+    - no async wrapper in javascript_tool: (async () => ...)() comes back as
+      {}. Top-level await works; synchronous is safest. Return an object or
+      a JSON.stringify string
+    - a background tab is fine on a light page. On a heavy one it gave blank
+      saves and timeouts; use tabs_create_mcp, active by default, and wait 2
+      seconds after navigating
+    - a session started without --chrome has no Chrome tools; the fallback is
+      a nested claude --chrome -p, at about 75 seconds a shot. Script it
+      completely -- fixed JavaScript, no clicks, no scrolling, a one-line
+      JSON reply naming the file -- and let it decide nothing; a sub-agent
+      left to scroll and look is what takes an hour. Name the tools exactly
+      in --allowedTools: mcp__claude-in-chrome__tabs_create_mcp, navigate,
+      javascript_tool (not javascript), computer, browser_batch,
+      tabs_context_mcp
 
   --window is still the way to photograph a whole browser window as it really
-  looks -- chrome, tabs and all, buried under everything else -- but for
-  anything inside the page, the picture the browser took is the one that is
-  certainly of the right tab.
+  looks -- chrome, tabs and all, buried under everything else -- and it is a
+  fair fallback when the tab can be kept in front for two seconds. But the
+  front tab changes under you, it needs the recipes switch, and for anything
+  inside the page the picture the browser took is the one that is certainly
+  of the right tab.
 
 REQUIREMENTS
   A live desktop session on this machine: it reads the actual screen. Over
