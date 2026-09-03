@@ -100,8 +100,15 @@ def main():
         # file, and nesting a whole session to find out. Name both.
         check("it names the Chrome handoff, not just 'a file'",
               "save_to_disk" in written and "browser_batch" in written)
-        check("and says the picture never goes through a nested session",
-              "claude --chrome -p" in written)
+        check("and says what a nested session must look like if it is used",
+              "claude --chrome -p" in written and "javascript_tool" in written)
+        # The post-mortem: a page zoom crops the save, a scroll gives a stale
+        # frame, an async wrapper comes back empty, a heavy tab wants a fresh
+        # one. Each cost an hour once; each is one line here.
+        check("it says the pixel ratio matters, and how",
+              "devicePixelRatio" in written and "--dpr" in written)
+        check("and what a scroll, an async wrapper and a heavy tab do",
+              "scroll" in flat and "async" in flat and "tabs_create_mcp" in written)
 
         check.section("installing again is the same file, not a second one")
         check("it succeeds", skill.install() == 0)

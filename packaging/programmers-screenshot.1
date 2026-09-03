@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-09-03" "programmers-screenshot 0.26.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-09-03" "programmers-screenshot 0.27.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -241,6 +241,14 @@ the file to measure it.
 .B \-\-scale
 wins if both are given.
 .TP
+.BR \-\-dpr " " \fIFACTOR\fR
+The page's
+.BR window.devicePixelRatio ,
+default 1. A browser save made at a page zoom other than 100% is cropped to
+1/\fIFACTOR\fR of the viewport, so
+.B \-\-viewport
+alone lands every mark short by that much; with both, the scale is right.
+.TP
 .BR \-\-origin " " \fIX,Y\fR
 Measure every coordinate from that point instead of from the corner of what
 was captured.
@@ -329,8 +337,8 @@ in which case nothing was captured and nothing was drawn.
 .SH RECIPES
 A screenshot can be described rather than taken by hand, so that something
 other than a person can produce one: a window or a picture to annotate, an
-origin and a scale or viewport width, a region, a delay, an output path and a
-list of marks, as JSON.
+origin and a scale, or a viewport width and pixel ratio, a region, a delay, an
+output path and a list of marks, as JSON.
 .PP
 .EX
 {"region": [100, 100, 900, 500],

@@ -22,7 +22,7 @@ from .geometry import Rect
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.26.0"
+VERSION = "0.27.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1
@@ -74,6 +74,11 @@ def build_parser():
         "--viewport", metavar="WIDTH", type=float,
         help="the picture shows a page this many pixels wide (window.innerWidth); "
         "the scale follows from that",
+    )
+    parser.add_argument(
+        "--dpr", metavar="FACTOR", type=float,
+        help="the page's window.devicePixelRatio (default 1); with --viewport, "
+        "corrects for a browser save cropped at a page zoom",
     )
     parser.add_argument(
         "--delay", metavar="SECONDS", type=float, default=0,
@@ -183,6 +188,8 @@ def main(argv=None):
         options.scale = options.scale or spec.get("scale")
         if options.viewport is None:  # 0 is a mistake to name, not "none given"
             options.viewport = spec.get("viewport")
+        if options.dpr is None:
+            options.dpr = spec.get("dpr")
         options.delay = options.delay or spec.get("delay") or 0
 
         if reads_the_screen(options) and not preferences.load().get("scripted"):
@@ -329,12 +336,20 @@ def frame_for(bounds, options):
     A browser knows window.innerWidth and the picture knows its own width, so
     nothing in between has to open the file to measure it. --scale beats
     --viewport when both are given, the way a flag beats a recipe.
+
+    --dpr is window.devicePixelRatio. A Claude in Chrome save made at a page
+    zoom other than 100% is cropped to 1/dpr of the viewport -- measured
+    against dots the page drew, at 125% -- so the width alone lands every
+    mark short by that much. The picture's width times dpr is the width the
+    whole viewport was rendered at, and that over innerWidth is the scale.
     """
     scale = options.scale
     if not scale and options.viewport is not None:
-        if options.viewport <= 0:
-            raise recipe.RecipeError("viewport: expected a width more than zero")
-        scale = bounds.width / float(options.viewport)
+        dpr = 1.0 if options.dpr is None else options.dpr
+        for name, value in (("viewport", options.viewport), ("dpr", dpr)):
+            if value <= 0:
+                raise recipe.RecipeError("%s: expected a number more than zero" % name)
+        scale = bounds.width * dpr / float(options.viewport)
     return recipe.Frame(bounds, options.origin, scale)
 
 

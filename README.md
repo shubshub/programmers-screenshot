@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.26.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.27.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.26.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.27.0_all.deb
 ```
 
 ## Bind it to a key
@@ -124,6 +124,7 @@ square, the rectangle too, and lines and arrows snap to 45° angles.
     --origin X,Y        measure coordinates from there, not from the corner
     --scale FACTOR      picture pixels per one of yours
     --viewport WIDTH    or the page width the picture shows; the scale follows
+    --dpr FACTOR        and its devicePixelRatio, when the page is zoomed
     --list-windows      list the windows --window can name
     --region X,Y,W,H    capture that area, no overlay
     --delay SECONDS     wait before the screen is read
@@ -184,23 +185,30 @@ A browser can capture the tab it means, so let it, and annotate what it gives
 you:
 
 ```bash
-programmers-screenshot --input tab.jpg --viewport 1720 -o shot.png --recipe -
+programmers-screenshot --input tab.jpg --viewport 1376 --dpr 1.25 -o shot.png --recipe -
 ```
 
-`--viewport` is `window.innerWidth`; the scale is worked out from the picture's
-own width, and with it every coordinate in the recipe is the page's own,
-straight out of `getBoundingClientRect()`, with nothing to convert. `--scale`
-does the same by hand, as the picture's width over the viewport's. `--input`
-is quiet — no shutter, no notification — because no screen was read.
+`--viewport` is `window.innerWidth` and `--dpr` is `window.devicePixelRatio`;
+the scale is worked out from those and the picture's own width, and with it
+every coordinate in the recipe is the page's own, straight out of
+`getBoundingClientRect()`, with nothing to convert. Pass both: a save made at a
+page zoom other than 100% is cropped to 1/dpr of the viewport, so the width
+alone lands every mark short — a quarter short at 125%, measured against dots
+the page drew. `--scale` does the same by hand, if you know it. `--input` is
+quiet — no shutter, no notification — because no screen was read.
 
-With Claude in Chrome that is two tool calls, both from the session that has
-the Chrome tools connected (`claude --chrome`): one `browser_batch` holding a
-`javascript_tool` call for `window.innerWidth` and the rectangles, then
-`computer` with `action: "screenshot"` and `save_to_disk: true`, which names
-the JPEG it wrote under `/tmp/claude-chrome-screenshots-*/` — of a background
-tab, if that is the one asked for. Then one Bash call running the recipe. The
-picture must never go through a nested `claude --chrome -p`: that hands back
-prose, and takes minutes to do what these two take seconds.
+With Claude in Chrome that is two tool calls, from the session that has the
+Chrome tools connected (`claude --chrome`): one `browser_batch` holding a
+`javascript_tool` call for `innerWidth`, `devicePixelRatio` and the
+rectangles, then `computer` with `action: "screenshot"` and `save_to_disk:
+true`, which names the JPEG it wrote under `/tmp/claude-chrome-screenshots-*/`.
+Then one Bash call running the recipe. Do not scroll in that batch — a capture
+straight after a scroll can be a stale frame — and give a heavy page a fresh
+tab and a two-second wait. A nested `claude --chrome -p` is the fallback when
+the session has no Chrome tools of its own: script it completely, because a
+sub-agent left to scroll and look is what takes an hour. `--recipe-help` has
+the details; so does `docs/postmortem-2026-09-03-claude-in-chrome-tab-capture.md`,
+which is where they were learnt.
 
 `--window` is X11 only and wants `gir1.2-wnck-3.0`; `--input` needs neither.
 

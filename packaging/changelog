@@ -1,3 +1,22 @@
+programmers-screenshot (0.27.0) noble; urgency=medium
+
+  * --dpr FACTOR (or "dpr" in a recipe) takes window.devicePixelRatio
+    alongside --viewport. A Claude in Chrome save made at a page zoom other
+    than 100% is cropped to 1/dpr of the viewport, so the width alone landed
+    every mark a quarter short at 125%. With both numbers the scale is exact
+    at 100% and at 125%, checked against dots the page drew.
+  * The skill and --recipe-help say what a post-mortem found about Chrome
+    captures: no scroll in the capture batch, because a stale frame follows
+    one; wait two seconds after a DOM change and retry a capture timeout
+    once; a fresh active tab for a heavy page; no async wrapper in
+    javascript_tool; and how to script a nested claude --chrome -p when the
+    session has no Chrome tools of its own. --window is described as the
+    fair fallback it is.
+  * The post-mortem and its scripts are in docs/, with a synthetic stand-in
+    for the captured page.
+
+ -- Shubshub  Thu, 03 Sep 2026 13:48:24 +1200
+
 programmers-screenshot (0.26.0) noble; urgency=medium
 
   * A browser tab is now a two-call job from Claude in Chrome. The skill and
