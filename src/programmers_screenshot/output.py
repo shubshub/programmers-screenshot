@@ -137,9 +137,13 @@ def _copy_via_gtk(pixbuf):
     return True
 
 
-def deliver(pixbuf, options):
-    """Save and/or copy, then say so. Returns the saved path, if any."""
-    if not options.no_sound:
+def deliver(pixbuf, options, quiet=False):
+    """Save and/or copy, then say so. Returns the saved path, if any.
+
+    `quiet` is for --input: nothing was photographed, so there is no shutter
+    to sound and no shot to announce. The path is still printed.
+    """
+    if not quiet and not options.no_sound:
         sound.play()  # first, so the shutter lands with the capture
 
     path = None
@@ -150,6 +154,9 @@ def deliver(pixbuf, options):
 
     if path:
         print(path)
+    if quiet:
+        return path
+    if path:
         notifications.announce_file(path)
     else:
         size = "%d × %d" % (pixbuf.get_width(), pixbuf.get_height())

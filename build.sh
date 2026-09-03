@@ -5,7 +5,7 @@
 #   ./build.sh --install    -> build, then install it with apt
 set -euo pipefail
 
-VERSION="0.25.0"
+VERSION="0.26.0"
 PACKAGE="programmers-screenshot"
 ARCH="all"
 

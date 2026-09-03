@@ -1,4 +1,4 @@
-.TH PROGRAMMERS\-SCREENSHOT 1 "2026-09-02" "programmers-screenshot 0.25.0" "User Commands"
+.TH PROGRAMMERS\-SCREENSHOT 1 "2026-09-03" "programmers-screenshot 0.26.0" "User Commands"
 .SH NAME
 programmers\-screenshot \- region screenshot tool for hotkey binding
 .SH SYNOPSIS
@@ -222,7 +222,8 @@ being drawn at all, so a background tab has no pixels on the screen to
 photograph. Naming a window, or having a page mark itself somehow, is only ever
 a guess about which tab is in front, and it is wrong the moment somebody
 switches tabs. A browser can capture the tab it means; let it, and annotate
-what it produces.
+what it produces. Quiet: no shutter and no notification, because no screen was
+read.
 .TP
 .BR \-\-scale " " \fIFACTOR\fR
 The picture holds this many of its own pixels per one of yours. A browser
@@ -231,6 +232,14 @@ screenshot 1242 pixels wide of a 1720 pixel viewport is \fB\-\-scale
 .BR getBoundingClientRect() .
 Positions and sizes are scaled; how a mark is drawn is not, so a width of 4 is
 4 pixels of the picture either way.
+.TP
+.BR \-\-viewport " " \fIWIDTH\fR
+The picture shows a page this many logical pixels wide \-
+.B window.innerWidth
+\- and the scale follows from the picture's own width, so nothing has to open
+the file to measure it.
+.B \-\-scale
+wins if both are given.
 .TP
 .BR \-\-origin " " \fIX,Y\fR
 Measure every coordinate from that point instead of from the corner of what
@@ -320,8 +329,8 @@ in which case nothing was captured and nothing was drawn.
 .SH RECIPES
 A screenshot can be described rather than taken by hand, so that something
 other than a person can produce one: a window or a picture to annotate, an
-origin and a scale, a region, a delay, an output path and a list of marks, as
-JSON.
+origin and a scale or viewport width, a region, a delay, an output path and a
+list of marks, as JSON.
 .PP
 .EX
 {"region": [100, 100, 900, 500],
