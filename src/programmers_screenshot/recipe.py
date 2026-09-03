@@ -37,8 +37,8 @@ class RecipeError(ValueError):
 
 
 #: What a recipe may say at the top level.
-KEYS = ("input", "window", "origin", "scale", "region", "delay", "output",
-        "annotate")
+KEYS = ("input", "window", "origin", "scale", "viewport", "region", "delay",
+        "output", "annotate")
 
 #: What an entry may carry besides the shape itself. One set for all of them:
 #: the mistake worth catching is a misspelling, not a width on a step badge.
@@ -252,12 +252,13 @@ def parse(text):
         raise RecipeError("delay: expected seconds, got %s" % json.dumps(delay))
     if spec.get("origin") is not None:
         numbers(spec["origin"], 2, "origin")
-    scale = spec.get("scale")
-    if scale is not None and (
-        isinstance(scale, bool) or not isinstance(scale, (int, float)) or scale <= 0
-    ):
-        raise RecipeError("scale: expected a number more than zero, got %s"
-                          % json.dumps(scale))
+    for key in ("scale", "viewport"):
+        value = spec.get(key)
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0
+        ):
+            raise RecipeError("%s: expected a number more than zero, got %s"
+                              % (key, json.dumps(value)))
     for key in ("output", "window", "input"):
         if spec.get(key) is not None and not isinstance(spec[key], str):
             raise RecipeError("%s: expected a string, got %s"
@@ -388,9 +389,13 @@ COORDINATES
     --scale FACTOR    the picture holds this many of its pixels per one of
                       yours, so a browser screenshot 1242 px wide of a 1720 px
                       viewport is --scale 0.7221
+    --viewport WIDTH  or say the picture shows a page this many logical pixels
+                      wide (window.innerWidth) and the scale is worked out
+                      from the picture's own width; --scale wins if both given
 
-  Both move where marks land. Neither touches how they are drawn: a width of
-  4 is 4 pixels of the picture, whatever ruler the coordinates came in on.
+  They move where marks land. None of them touches how marks are drawn: a
+  width of 4 is 4 pixels of the picture, whatever ruler the coordinates came
+  in on.
 
 RECIPE
   A JSON object. Every key is optional.
@@ -401,6 +406,7 @@ RECIPE
                                            the whole screen
       "origin":   [x, y],                  move where coordinates start
       "scale":    0.7221,                  picture pixels per one of yours
+      "viewport": 1720,                    or the page width the picture shows
       "region":   [x, y, width, height],   all of it if left out
       "delay":    2,                       seconds to wait before capturing
       "output":   "docs/img/save.png",     -o wins over this
@@ -443,19 +449,29 @@ WORKING FROM A BROWSER
   it means, front or not. So let it:
 
     1. the browser screenshots the tab, to a file
-    2. --input that file, with --scale for the size it came out at
+    2. --input that file, with --viewport for window.innerWidth (or --scale
+       for the size it came out at)
     3. every coordinate is then the page's own, out of
        getBoundingClientRect(), with nothing to convert
 
-    {"input": "tab.png",
-     "scale": 0.7221,
+    {"input": "tab.jpg",
+     "viewport": 1720,
      "region": [300, 170, 1130, 180],
      "annotate": [{"box": [344, 198, 1032, 29]},
                   {"step": [332, 212]}]}
 
-  The scale is the picture's width over window.innerWidth. Ask the page for
-  the rectangles you want in the same breath as the screenshot, so the two
-  cannot describe different scroll positions.
+  With Claude in Chrome that is two tool calls, both from the session that
+  has the Chrome tools connected (claude --chrome): one browser_batch holding
+  a javascript_tool call for window.innerWidth and the rectangles, then
+  computer with action "screenshot" and save_to_disk true, which names the
+  file it wrote under /tmp/claude-chrome-screenshots-*/ -- a JPEG, which is
+  fine, and of a background tab if that is the one asked for. Then one Bash
+  call running the recipe above. Do not shell out to claude --chrome -p for
+  the picture: a nested session can only hand back prose, and takes minutes
+  to do what these two take seconds.
+
+  Ask the page for the rectangles you want in the same breath as the
+  screenshot, so the two cannot describe different scroll positions.
 
   --window is still the way to photograph a whole browser window as it really
   looks -- chrome, tabs and all, buried under everything else -- but for
@@ -470,9 +486,9 @@ REQUIREMENTS
   window. It needs X11, and libwnck (gir1.2-wnck-3.0).
 
   --input still reads the screen not at all, but it draws through the same
-  machinery as everything else and so still wants a display.
-  A capture takes 1.5 seconds or so, which is fine for documentation and too
-  slow for a loop.
+  machinery as everything else and so still wants a display. It is quiet: no
+  shutter and no notification, because nothing was photographed.
+  A run takes a fraction of a second.
 
   Off until switched on: tick "Let a recipe drive captures" in the settings
   window (the sliders button on the overlay toolbar).

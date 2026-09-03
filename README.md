@@ -21,13 +21,13 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.25.0_all.deb` and installs it with
+That produces `dist/programmers-screenshot_0.26.0_all.deb` and installs it with
 apt (which pulls in the dependencies). To build without installing, drop the
 flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.25.0_all.deb
+sudo apt install ./dist/programmers-screenshot_0.26.0_all.deb
 ```
 
 ## Bind it to a key
@@ -123,6 +123,7 @@ square, the rectangle too, and lines and arrows snap to 45° angles.
     --input FILE        annotate this image instead of capturing
     --origin X,Y        measure coordinates from there, not from the corner
     --scale FACTOR      picture pixels per one of yours
+    --viewport WIDTH    or the page width the picture shows; the scale follows
     --list-windows      list the windows --window can name
     --region X,Y,W,H    capture that area, no overlay
     --delay SECONDS     wait before the screen is read
@@ -183,12 +184,23 @@ A browser can capture the tab it means, so let it, and annotate what it gives
 you:
 
 ```bash
-programmers-screenshot --input tab.png --scale 0.7221 -o shot.png --recipe -
+programmers-screenshot --input tab.jpg --viewport 1720 -o shot.png --recipe -
 ```
 
-`--scale` is the picture's width over `window.innerWidth`, and with it every
-coordinate in the recipe is the page's own, straight out of
-`getBoundingClientRect()`, with nothing to convert.
+`--viewport` is `window.innerWidth`; the scale is worked out from the picture's
+own width, and with it every coordinate in the recipe is the page's own,
+straight out of `getBoundingClientRect()`, with nothing to convert. `--scale`
+does the same by hand, as the picture's width over the viewport's. `--input`
+is quiet — no shutter, no notification — because no screen was read.
+
+With Claude in Chrome that is two tool calls, both from the session that has
+the Chrome tools connected (`claude --chrome`): one `browser_batch` holding a
+`javascript_tool` call for `window.innerWidth` and the rectangles, then
+`computer` with `action: "screenshot"` and `save_to_disk: true`, which names
+the JPEG it wrote under `/tmp/claude-chrome-screenshots-*/` — of a background
+tab, if that is the one asked for. Then one Bash call running the recipe. The
+picture must never go through a nested `claude --chrome -p`: that hands back
+prose, and takes minutes to do what these two take seconds.
 
 `--window` is X11 only and wants `gir1.2-wnck-3.0`; `--input` needs neither.
 

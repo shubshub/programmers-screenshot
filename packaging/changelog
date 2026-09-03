@@ -1,3 +1,19 @@
+programmers-screenshot (0.26.0) noble; urgency=medium
+
+  * A browser tab is now a two-call job from Claude in Chrome. The skill and
+    --recipe-help name the handoff exactly -- one browser_batch that reads
+    window.innerWidth and the rectangles and saves the screenshot to disk,
+    then one run of --input -- and say the picture must never go through a
+    nested claude --chrome -p session, which is where an hour went.
+  * --viewport WIDTH (or "viewport" in a recipe) takes window.innerWidth and
+    works the scale out from the picture's own width, so nothing has to open
+    the file to measure it. --scale still wins when both are given.
+  * --input is quiet: no shutter, no notification and no five-minute
+    notification agent, because no screen was read. The path is still
+    printed, and the clipboard is still yours to opt out of.
+
+ -- Shubshub  Thu, 03 Sep 2026 12:24:08 +1200
+
 programmers-screenshot (0.25.0) noble; urgency=medium
 
   * A screenshot can now be described rather than taken by hand, so that

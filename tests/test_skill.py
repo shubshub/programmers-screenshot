@@ -96,6 +96,12 @@ def main():
               "settings window" in flat and "their decision" in flat)
         check("and warns about what a screen may be showing",
               "redact" in flat and "averages leak" in flat)
+        # Last night an agent lost an hour not knowing how a browser writes a
+        # file, and nesting a whole session to find out. Name both.
+        check("it names the Chrome handoff, not just 'a file'",
+              "save_to_disk" in written and "browser_batch" in written)
+        check("and says the picture never goes through a nested session",
+              "claude --chrome -p" in written)
 
         check.section("installing again is the same file, not a second one")
         check("it succeeds", skill.install() == 0)

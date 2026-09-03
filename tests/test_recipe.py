@@ -10,7 +10,9 @@ wants a display, and it says so and skips itself when there is none.
 
 import json
 import os
+import shutil
 import sys
+import tempfile
 
 import cairo
 import gi
@@ -30,7 +32,7 @@ sys.path.insert(
 )
 
 from programmers_screenshot import (  # noqa: E402
-    capture, cli, preferences, recipe, theme,
+    capture, cli, output, preferences, recipe, theme,
 )
 from programmers_screenshot.geometry import Rect  # noqa: E402
 from programmers_screenshot.overlay import Canvas, Overlay  # noqa: E402
@@ -126,6 +128,7 @@ def main():
     refused(check, "an input that is not a path", '{"input": 3}', "input")
     refused(check, "an origin that is not a point", '{"origin": [1]}', "origin")
     refused(check, "a scale of zero", '{"scale": 0}', "scale")
+    refused(check, "a viewport of zero", '{"viewport": 0}', "viewport")
     refused(check, "annotate that is not a list", '{"annotate": {}}', "annotate")
 
     check.section("a bad mark names its own position in the list")
@@ -221,6 +224,7 @@ def main():
           all(name in described for name in recipe.COLOURS))
     check("it says a display is needed", "no display" in described)
     check("and that it is off until switched on", "Off until switched on" in described)
+    check("it names the Chrome handoff", "save_to_disk" in described)
 
     check.section("the flags that reach it")
     parsed = cli.build_parser().parse_args(
@@ -248,6 +252,7 @@ def main():
         check("%s -> %s" % (" ".join(flags) or "(nothing)", wanted),
               cli.reads_the_screen(parse(*flags)) == wanted)
     check("--delay is a number", parsed.delay == 2.0)
+    check("--viewport is carried", parse("--viewport", "1720").viewport == 1720.0)
     check("--recipe is carried", parsed.recipe == "-")
     check("a recipe counts as scripted", cli.scripted(parsed))
     check("an ordinary run does not",
@@ -266,6 +271,45 @@ def main():
     check("but its stroke is not scaled with it", box.width == 4, box.width)
     check("no scale leaves everything alone",
           recipe.Frame(stand.bounds).at(10, 20) == (10.0, 20.0))
+
+    check.section("a viewport width stands in for the scale")
+    # The browser knows window.innerWidth and the picture knows its own width,
+    # so nobody has to open the file with a third tool to measure it.
+    picture = Rect(0, 0, 1242, 952)
+    frame = cli.frame_for(picture, parse("--input", "x.jpg", "--viewport", "1720"))
+    check("scale is the picture's width over the viewport's",
+          abs(frame.scale - 1242 / 1720.0) < 1e-9, frame.scale)
+    check("--scale still wins when both are given",
+          cli.frame_for(picture, parse("--scale", "0.5", "--viewport", "1720")).scale
+          == 0.5)
+    check("neither leaves the ruler alone",
+          cli.frame_for(picture, parse("--input", "x.jpg")).scale == 1.0)
+    try:
+        cli.frame_for(picture, parse("--viewport", "0"))
+        check("a viewport of zero is refused", False, "accepted")
+    except recipe.RecipeError as error:
+        check("a viewport of zero is refused", "viewport" in str(error), error)
+
+    check.section("--input is quiet: nothing was photographed")
+    heard = []
+    real = output.sound.play, output.notifications.announce_file
+    output.sound.play = lambda: heard.append("shutter")
+    output.notifications.announce_file = lambda path: heard.append("notice")
+    folder = tempfile.mkdtemp(prefix="programmers-screenshot-quiet-")
+    try:
+        quiet = parse("--input", "x.jpg", "-o", os.path.join(folder, "a.png"),
+                      "--no-clipboard")
+        written = output.deliver(white_pixbuf(SCREEN), quiet, quiet=True)
+        check("the file is still written and its path returned",
+              bool(written) and os.path.exists(written), written)
+        check("but no shutter and no notification", heard == [], heard)
+        output.deliver(white_pixbuf(SCREEN),
+                       parse("-o", os.path.join(folder, "b.png"), "--no-clipboard"))
+        check("a real shot still sounds and announces",
+              heard == ["shutter", "notice"], heard)
+    finally:
+        output.sound.play, output.notifications.announce_file = real
+        shutil.rmtree(folder, ignore_errors=True)
 
     check.section("an origin moves where coordinates start")
     # An origin of (90, 40) says "call that corner (0, 0)", so a mark at

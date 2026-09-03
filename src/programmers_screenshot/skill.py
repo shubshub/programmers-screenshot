@@ -89,29 +89,42 @@ codes. What is below is only what to know before reading it.
 - `--window TITLE` - one window, even one completely buried under others.
   Nothing is raised and nothing on top of it gets into the picture.
   `--list-windows` shows what can be named. X11 only.
-- `--input FILE --scale N` - annotate a picture something else took.
+- `--input FILE --viewport WIDTH` - annotate a picture something else took,
+  which is how a browser tab is done.
 
-## A browser tab
+## A browser tab, with Claude in Chrome
 
-Use `--input`. Nothing outside a browser can address a tab: a tab is not a
-window, and only a window's front tab is being drawn at all, so a background
-tab has no pixels on the screen to photograph. Naming a window only guesses
-which tab is in front, and is wrong the moment somebody switches tabs.
+Two tool calls, both from the session that has the Chrome tools connected
+(`claude --chrome`, or `/chrome` in a running session). Never shell out to
+`claude --chrome -p` for the picture: a nested session can only hand back
+prose, so the path and every number has to be parsed out of a paragraph, and
+it takes minutes to do what these two take seconds.
 
-1. Have the browser screenshot the tab to a file.
-2. Ask the page for the rectangles wanted, in the same breath as the
-   screenshot, so the two cannot describe different scroll positions:
-   `document.querySelector(sel).getBoundingClientRect()`.
-3. `--scale` is the picture's width over `window.innerWidth`.
-4. Every coordinate in the recipe is then the page's own, unconverted.
+1. One `browser_batch`: a `javascript_tool` call returning `window.innerWidth`
+   and the `getBoundingClientRect()` of each element wanted, then `computer`
+   with `action: "screenshot"` and `save_to_disk: true`. The result names the
+   file: `/tmp/claude-chrome-screenshots-*/screenshot-*.jpg`. A JPEG is fine.
+   A background tab works; nothing has to be brought to the front.
+2. One Bash call, with the rectangles used exactly as they came:
 
-```json
-{"input": "tab.png",
- "scale": 0.7221,
- "region": [60, 105, 800, 205],
- "annotate": [{"box": [155, 149, 263, 99], "colour": "red", "width": 3},
-              {"arrow": [[700, 282], [432, 205]], "colour": "red"}]}
+```bash
+programmers-screenshot --input <that file> --viewport <innerWidth> -o out.png --no-clipboard --recipe - <<'EOF'
+{"annotate": [{"box": [344, 198, 1032, 29], "colour": "red", "width": 3},
+              {"step": [332, 212]}]}
+EOF
 ```
+
+`--viewport` is `window.innerWidth`; the scale is worked out from the picture's
+own width, so nothing has to open the file to measure it. Ask the page for its
+rectangles in the same batch as the screenshot, so the two cannot describe
+different scroll positions. `--input` is quiet: no shutter, no notification,
+because no screen was read.
+
+Why `--input` and never `--window`: a tab is not a window, and only a
+window's front tab is being drawn at all, so a background tab has no pixels on
+the screen to photograph. Naming a window only guesses which tab is in front,
+is wrong the moment somebody switches tabs, and needs the recipes switch,
+which `--input` does not.
 
 ## Before it will run
 

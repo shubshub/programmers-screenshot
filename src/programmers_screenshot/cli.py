@@ -22,7 +22,7 @@ from .geometry import Rect
 from .overlay import Overlay
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.25.0"
+VERSION = "0.26.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1
@@ -69,6 +69,11 @@ def build_parser():
     parser.add_argument(
         "--scale", metavar="FACTOR", type=float,
         help="the picture is this many of its pixels per one of yours",
+    )
+    parser.add_argument(
+        "--viewport", metavar="WIDTH", type=float,
+        help="the picture shows a page this many pixels wide (window.innerWidth); "
+        "the scale follows from that",
     )
     parser.add_argument(
         "--delay", metavar="SECONDS", type=float, default=0,
@@ -176,6 +181,8 @@ def main(argv=None):
         options.origin = options.origin or spec.get("origin")
         options.input = options.input or spec.get("input")
         options.scale = options.scale or spec.get("scale")
+        if options.viewport is None:  # 0 is a mistake to name, not "none given"
+            options.viewport = spec.get("viewport")
         options.delay = options.delay or spec.get("delay") or 0
 
         if reads_the_screen(options) and not preferences.load().get("scripted"):
@@ -227,8 +234,11 @@ def main(argv=None):
         sys.stderr.write("%s\n" % error)
         return EXIT_CANCELLED
 
+    # --input photographed nothing, so there is no shot to announce.
+    quiet = bool(options.input)
+
     if options.full:
-        output.deliver(pixbuf, with_preferences(options))
+        output.deliver(pixbuf, with_preferences(options), quiet)
         after_capture(options)
         return EXIT_OK
 
@@ -238,7 +248,7 @@ def main(argv=None):
         except recipe.RecipeError as error:
             sys.stderr.write("%s\n" % error)
             return EXIT_BAD_USAGE
-        output.deliver(captured, with_preferences(options))
+        output.deliver(captured, with_preferences(options), quiet)
         after_capture(options)
         return EXIT_OK
 
@@ -306,11 +316,26 @@ def render_recipe(pixbuf, bounds, options, spec):
     exist twice.
     """
     overlay = Overlay(pixbuf, bounds, tools.build_tools())
-    frame = recipe.Frame(bounds, options.origin, options.scale)
+    frame = frame_for(bounds, options)
     if options.region is not None:
         overlay.scene.do(recipe.region(options.region, frame))
     recipe.annotate(spec, overlay, frame)
     return overlay.render()
+
+
+def frame_for(bounds, options):
+    """The caller's ruler: --scale as given, or worked out from --viewport.
+
+    A browser knows window.innerWidth and the picture knows its own width, so
+    nothing in between has to open the file to measure it. --scale beats
+    --viewport when both are given, the way a flag beats a recipe.
+    """
+    scale = options.scale
+    if not scale and options.viewport is not None:
+        if options.viewport <= 0:
+            raise recipe.RecipeError("viewport: expected a width more than zero")
+        scale = bounds.width / float(options.viewport)
+    return recipe.Frame(bounds, options.origin, scale)
 
 
 def after_capture(options):
