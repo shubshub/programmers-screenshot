@@ -15,11 +15,12 @@ gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 from . import (  # noqa: I101
-    alerts, capture, hotkey, notifications, output, preferences, recipe, skill,
-    tools, updates,
+    alerts, capture, hotkey, notifications, output, paths, preferences, recipe,
+    skill, tools, updates,
 )
 from .geometry import Rect
 from .overlay import Overlay
+from .render import Renderer
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
 VERSION = "0.27.0"
@@ -146,11 +147,12 @@ def version_banner():
     )
 
 
-def main(argv=None):
-    options = build_parser().parse_args(argv if argv is not None else sys.argv[1:])
+def _utility_command(options):
+    """The runs that do a job and stop: an exit code, or None to carry on.
 
-    # First, and before any mention of a display: whoever is about to drive
-    # this needs to be able to ask what it can do from wherever they are.
+    First, and before any mention of a display: whoever is about to drive
+    this needs to be able to ask what it can do from wherever they are.
+    """
     if options.recipe_help:
         print(recipe.describe())
         return EXIT_OK
@@ -169,44 +171,112 @@ def main(argv=None):
         return hotkey.uninstall()
     if options.install_hotkey:
         return hotkey.install(options.install_hotkey)
+    return None
 
-    if scripted(options):
+
+def _merge_recipe(options, spec):
+    """Fill in from the recipe whatever the command line left out.
+
+    A flag beats the recipe, the same way it beats a preference. What counts
+    as "not given" differs by key: nobody means an empty region or a scale of
+    zero, but 0 is a mistake worth naming rather than a silence for a
+    viewport or a device pixel ratio.
+    """
+    for key in ("output", "region", "window", "origin", "input", "scale"):
+        setattr(options, key, getattr(options, key) or spec.get(key))
+    for key in ("viewport", "dpr"):  # 0 is a mistake to name, not "none given"
+        if getattr(options, key) is None:
+            setattr(options, key, spec.get(key))
+    options.delay = options.delay or spec.get("delay") or 0
+
+
+def _acquire(options, display):
+    """The picture this run works on. Raises capture.CaptureError."""
+    if options.input:
+        return load_input(options.input)
+    if options.window:
+        # Coordinates come back relative to the window, which is what a
+        # caller working from inside it already has.
+        return capture.capture_window(display, options.window)
+    return capture.capture_screen(display)
+
+
+def _prepare_recipe(options):
+    """What a scripted run is being asked for, settled before any capture.
+
+    Returns the recipe -- empty when there is none -- and an exit code, which
+    is None while there is still a screenshot to take. Nothing here looks at
+    the screen, which is the point: a recipe that cannot be understood, a run
+    that is not allowed one, and --list-windows all finish without a shutter
+    going off.
+    """
+    if not scripted(options):
+        return {}, None
+    try:
+        # Read before anything is checked or captured: a recipe that
+        # cannot be understood costs nothing and leaves nothing half
+        # drawn, and what it says decides whether the switch applies.
+        spec = recipe.load(options.recipe) if options.recipe else {}
+    except recipe.RecipeError as error:
+        sys.stderr.write("%s\n" % error)
+        return {}, EXIT_BAD_USAGE
+    _merge_recipe(options, spec)
+
+    if reads_the_screen(options) and not preferences.load().get("scripted"):
+        sys.stderr.write(
+            "recipes are switched off. Tick \"Let a recipe drive captures\" in\n"
+            "the settings window, on the overlay toolbar. See --recipe-help.\n"
+        )
+        return spec, EXIT_BAD_USAGE
+    if options.list_windows:
         try:
-            # Read before anything is checked or captured: a recipe that
-            # cannot be understood costs nothing and leaves nothing half
-            # drawn, and what it says decides whether the switch applies.
-            spec = recipe.load(options.recipe) if options.recipe else {}
+            print(capture.describe_windows())
+        except capture.CaptureError as error:
+            sys.stderr.write("%s\n" % error)
+            return spec, EXIT_CANCELLED
+        return spec, EXIT_OK
+    return spec, None
+
+
+def _deliver(pixbuf, bounds, options, spec, quiet):
+    """Turn the capture into the shot that was asked for, and hand it over.
+
+    Three ways to the same place: --full takes the screen as it stands, a
+    recipe draws on it with nobody there, and otherwise a person marks it up
+    through the overlay.
+    """
+    if options.full:
+        output.deliver(pixbuf, with_preferences(options), quiet)
+    elif scripted(options):
+        try:
+            captured = render_recipe(pixbuf, bounds, options, spec)
         except recipe.RecipeError as error:
             sys.stderr.write("%s\n" % error)
             return EXIT_BAD_USAGE
-        # A flag beats the recipe, the same way it beats a preference.
-        options.output = options.output or spec.get("output")
-        options.region = options.region or spec.get("region")
-        options.window = options.window or spec.get("window")
-        options.origin = options.origin or spec.get("origin")
-        options.input = options.input or spec.get("input")
-        options.scale = options.scale or spec.get("scale")
-        if options.viewport is None:  # 0 is a mistake to name, not "none given"
-            options.viewport = spec.get("viewport")
-        if options.dpr is None:
-            options.dpr = spec.get("dpr")
-        options.delay = options.delay or spec.get("delay") or 0
-
-        if reads_the_screen(options) and not preferences.load().get("scripted"):
-            sys.stderr.write(
-                "recipes are switched off. Tick \"Let a recipe drive captures\" in\n"
-                "the settings window, on the overlay toolbar. See --recipe-help.\n"
-            )
-            return EXIT_BAD_USAGE
-        if options.list_windows:
-            try:
-                print(capture.describe_windows())
-            except capture.CaptureError as error:
-                sys.stderr.write("%s\n" % error)
-                return EXIT_CANCELLED
-            return EXIT_OK
+        output.deliver(captured, with_preferences(options), quiet)
     else:
-        spec = {}
+        captured = run_overlay(pixbuf, bounds)
+        if captured is None:
+            return EXIT_CANCELLED
+        # After the overlay, not before: the settings window writes the file
+        # while the overlay is up, and the capture in hand has to honour what
+        # it says. Reading at startup meant a change only took effect from the
+        # next run.
+        output.deliver(captured, with_preferences(options))
+    after_capture(options)
+    return EXIT_OK
+
+
+def main(argv=None):
+    options = build_parser().parse_args(argv if argv is not None else sys.argv[1:])
+
+    code = _utility_command(options)
+    if code is not None:
+        return code
+
+    spec, code = _prepare_recipe(options)
+    if code is not None:
+        return code
 
     # An early warning only; the values that count are read again after the
     # overlay, since the settings window can change them while it is open.
@@ -227,16 +297,8 @@ def main(argv=None):
         # than in ten seconds' time.
         time.sleep(options.delay)
 
-    display = Gdk.Display.get_default()
     try:
-        if options.input:
-            pixbuf, bounds = load_input(options.input)
-        elif options.window:
-            # Coordinates come back relative to the window, which is what a
-            # caller working from inside it already has.
-            pixbuf, bounds = capture.capture_window(display, options.window)
-        else:
-            pixbuf, bounds = capture.capture_screen(display)
+        pixbuf, bounds = _acquire(options, Gdk.Display.get_default())
     except capture.CaptureError as error:
         sys.stderr.write("%s\n" % error)
         return EXIT_CANCELLED
@@ -244,31 +306,7 @@ def main(argv=None):
     # --input photographed nothing, so there is no shot to announce.
     quiet = bool(options.input)
 
-    if options.full:
-        output.deliver(pixbuf, with_preferences(options), quiet)
-        after_capture(options)
-        return EXIT_OK
-
-    if scripted(options):
-        try:
-            captured = render_recipe(pixbuf, bounds, options, spec)
-        except recipe.RecipeError as error:
-            sys.stderr.write("%s\n" % error)
-            return EXIT_BAD_USAGE
-        output.deliver(captured, with_preferences(options), quiet)
-        after_capture(options)
-        return EXIT_OK
-
-    captured = run_overlay(pixbuf, bounds)
-    if captured is None:
-        return EXIT_CANCELLED
-
-    # After the overlay, not before: the settings window writes the file while
-    # the overlay is up, and the capture in hand has to honour what it says.
-    # Reading at startup meant a change only took effect from the next run.
-    output.deliver(captured, with_preferences(options))
-    after_capture(options)
-    return EXIT_OK
+    return _deliver(pixbuf, bounds, options, spec, quiet)
 
 
 def scripted(options):
@@ -304,9 +342,6 @@ def load_input(path):
     annotates that. Every other way round is a guess about which tab was in
     front.
 
-    ponytail: still goes through the overlay to draw, so it wants a display
-    even though it captures nothing. Split the renderer out of Overlay if
-    annotating in CI is ever wanted.
     """
     try:
         pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
@@ -319,16 +354,16 @@ def load_input(path):
 def render_recipe(pixbuf, bounds, options, spec):
     """The shot the recipe describes, with no window ever shown.
 
-    An Overlay with nothing mapped: it is the thing that knows how to bake a
-    scene into a region of the frozen screen, and that knowledge should not
-    exist twice.
+    A bare Renderer: no window, no toolbars, no tools built, because a recipe
+    needs none of them. The knowledge of how to bake a scene into a region of
+    the frozen screen is the renderer's, and the overlay borrows the same one.
     """
-    overlay = Overlay(pixbuf, bounds, tools.build_tools())
+    renderer = Renderer(pixbuf, bounds)
     frame = frame_for(bounds, options)
     if options.region is not None:
-        overlay.scene.do(recipe.region(options.region, frame))
-    recipe.annotate(spec, overlay, frame)
-    return overlay.render()
+        renderer.scene.do(recipe.region(options.region, frame))
+    recipe.annotate(spec, renderer, frame)
+    return renderer.render()
 
 
 def frame_for(bounds, options):
@@ -368,7 +403,7 @@ def after_capture(options):
         # A process of its own, so the request outlives us without us waiting
         # on it. Reading one timestamp first keeps this to once a day rather
         # than a spawn per screenshot.
-        notifications.spawn_detached(["--check-updates"])
+        paths.spawn_detached(["--check-updates"])
 
 
 def with_preferences(options):

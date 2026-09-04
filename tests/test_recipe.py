@@ -29,7 +29,8 @@ from programmers_screenshot import (  # noqa: E402
     capture, cli, output, preferences, recipe, theme,
 )
 from programmers_screenshot.geometry import Rect  # noqa: E402
-from programmers_screenshot.overlay import Canvas, Overlay  # noqa: E402
+from programmers_screenshot.overlay import Overlay  # noqa: E402
+from programmers_screenshot.render import Canvas  # noqa: E402
 from programmers_screenshot.scene import Scene  # noqa: E402
 from programmers_screenshot.tools import build_tools, items  # noqa: E402
 from programmers_screenshot.tools.pixelate import Pixelation  # noqa: E402

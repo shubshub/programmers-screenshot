@@ -13,7 +13,6 @@ capture is delivered.
 
 import contextlib
 import json
-import subprocess
 
 import gi
 
@@ -21,7 +20,7 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
-from .paths import running_program
+from .paths import spawn_detached
 
 TITLE = "Programmers Screenshot"
 WIDTH = 460
@@ -37,17 +36,7 @@ def show(heading, body, label=None, uri=None):
     payload = json.dumps(
         {"heading": heading, "body": body, "label": label, "uri": uri}
     )
-    try:
-        subprocess.Popen(
-            [running_program(), "--alert", payload],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,   # survives us exiting
-        )
-        return True
-    except OSError:
-        return False
+    return spawn_detached(["--alert", payload])
 
 
 def build(notice):

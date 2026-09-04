@@ -317,8 +317,11 @@ def region(value, frame):
     return SetRegion(_rect(numbers(value, 4, "region"), "region", frame))
 
 
-def annotate(spec, overlay, frame):
-    """Draw a loaded recipe's marks onto an overlay's scene.
+def annotate(spec, renderer, frame):
+    """Draw a loaded recipe's marks onto a renderer's scene.
+
+    Anything with a canvas() and a scene will do -- a bare Renderer with no
+    window, or the overlay wrapped round one.
 
     The region is not applied here: a recipe's region and --region are merged
     in the caller, along with its output and its delay, so that "a flag wins"
@@ -327,12 +330,12 @@ def annotate(spec, overlay, frame):
     Every mark is built before any of them is applied, so a mistake in the
     last arrow does not leave the first three drawn.
     """
-    canvas = overlay.canvas()
+    canvas = renderer.canvas()
     changes = []
     for index, entry in enumerate(spec.get("annotate") or []):
         changes.append(build(entry, "annotate[%d]" % index, canvas, frame))
     for change in changes:
-        overlay.scene.do(change)
+        renderer.scene.do(change)
 
 
 # -- telling a caller what it can ask for -----------------------------------

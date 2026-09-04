@@ -10,16 +10,13 @@ about new releases, and whether a recipe may take a shot with nobody
 watching. A flag always beats what is stored here; see cli.with_preferences.
 """
 
-import json
-import os
-
 import gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import Gtk  # noqa: E402
 
-from .paths import default_directory
+from .paths import config_file, default_directory, read_json, write_json
 
 BAR = "bar"
 PALETTE = "palette"
@@ -47,29 +44,24 @@ DEFAULTS = {
 def path():
     """Where the preferences live. A file, for the same reason the displaced
     hotkeys are one: this program has no GSettings schema of its own."""
-    return os.path.join(
-        GLib.get_user_config_dir(), "programmers-screenshot", "preferences.json"
-    )
+    return config_file("preferences.json")
 
 
 def load():
-    """Stored preferences, with anything missing or unreadable defaulted."""
+    """Stored preferences, with anything missing or unreadable defaulted.
+
+    Keys nobody recognises are dropped rather than carried along, so an old
+    file cannot smuggle a setting past the window that edits them.
+    """
     values = dict(DEFAULTS)
-    try:
-        with open(path(), "r", encoding="utf-8") as handle:
-            stored = json.load(handle)
-    except (OSError, ValueError):
-        return values
-    if isinstance(stored, dict):
-        values.update({k: v for k, v in stored.items() if k in DEFAULTS})
+    stored = read_json(path())
+    values.update({k: v for k, v in stored.items() if k in DEFAULTS})
     return values
 
 
 def save(values):
-    target = path()
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    with open(target, "w", encoding="utf-8") as handle:
-        json.dump(values, handle, indent=2, sort_keys=True)
+    """Raises OSError: somebody just chose these and is owed the news."""
+    write_json(path(), values)
 
 
 def build(values):

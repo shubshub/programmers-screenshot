@@ -8,7 +8,6 @@ mode, which lives only as long as the notification does.
 """
 
 import os
-import subprocess
 
 import gi
 
@@ -17,7 +16,7 @@ gi.require_version("GdkPixbuf", "2.0")
 
 from gi.repository import GdkPixbuf, Gio, GLib, Notify  # noqa: E402
 
-from .paths import running_program
+from .paths import spawn_detached
 
 APP_NAME = "Programmers Screenshot"
 ICON = "programmers-screenshot"
@@ -63,21 +62,6 @@ def describe(path):
         detail.append("%d × %d" % (info[1], info[2]))
     detail.append(os.path.dirname(path))
     return "%s\n%s" % (os.path.basename(path), " · ".join(detail))
-
-
-def spawn_detached(arguments):
-    """Start a detached copy of ourselves. False if it could not be launched."""
-    try:
-        subprocess.Popen(
-            [running_program()] + arguments,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,  # survives us exiting
-        )
-        return True
-    except OSError:
-        return False
 
 
 def _spawn_agent(path):

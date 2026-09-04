@@ -10,35 +10,22 @@ Missing, unreadable or malformed all mean the same thing: nothing is known
 yet. Nothing here is worth failing a screenshot over.
 """
 
-import json
-import os
+import contextlib
 
-from gi.repository import GLib
+from .paths import config_file, read_json, write_json
 
 
 def path():
-    return os.path.join(
-        GLib.get_user_config_dir(), "programmers-screenshot", "state.json"
-    )
+    return config_file("state.json")
 
 
 def load():
-    try:
-        with open(path(), "r", encoding="utf-8") as handle:
-            stored = json.load(handle)
-    except (OSError, ValueError):
-        return {}
-    return stored if isinstance(stored, dict) else {}
+    return read_json(path())
 
 
 def save(values):
-    target = path()
-    try:
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        with open(target, "w", encoding="utf-8") as handle:
-            json.dump(values, handle, indent=2, sort_keys=True)
-    except OSError:
-        pass  # bookkeeping; never worth interrupting anything for
+    with contextlib.suppress(OSError):  # bookkeeping; never worth a failure
+        write_json(path(), values)
 
 
 def remember(**changes):
