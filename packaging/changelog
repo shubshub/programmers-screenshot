@@ -1,3 +1,20 @@
+programmers-screenshot (0.27.1) noble; urgency=medium
+
+  * A clipboard helper that dies mid-copy no longer ends the run with a
+    traceback after the file was saved. The copy falls back to the GTK
+    clipboard, the same way it already did when no helper was installed.
+  * The version is written in one place, src/programmers_screenshot/cli.py.
+    build.sh, release.sh and the man page read it from there.
+  * An internal tidy, with nothing changed in how a shot is taken: one
+    reader for the config files, one way to spawn a helper process, a
+    renderer a recipe can use without building an overlay, cli.main split
+    into its steps, and dead code deleted. Every suite passes unchanged.
+  * For development: a ruff configuration, python3 tests/run.py to run every
+    suite, and a GitHub Actions workflow that lints, runs the suites under
+    Xvfb and builds the package on every push.
+
+ -- Shubshub  Fri, 04 Sep 2026 23:19:34 +1200
+
 programmers-screenshot (0.27.0) noble; urgency=medium
 
   * --dpr FACTOR (or "dpr" in a recipe) takes window.devicePixelRatio
