@@ -7,13 +7,12 @@ the user permanently without their Print Screen key and no clue why.
 """
 
 import contextlib
-import json
 import os
 import sys
 
-from gi.repository import Gio, GLib
+from gi.repository import Gio
 
-from .paths import installed_command
+from .paths import config_file, installed_command, read_json, write_json
 
 DEFAULT_ACCELERATOR = "Print"
 
@@ -48,9 +47,7 @@ def displaced_file():
     A file rather than gsettings, since the tool has no schema of its own to
     put them in.
     """
-    return os.path.join(
-        GLib.get_user_config_dir(), "programmers-screenshot", "displaced.json"
-    )
+    return config_file("displaced.json")
 
 
 def install(accelerator):
@@ -154,19 +151,12 @@ def _restore():
 
 
 def _load():
-    try:
-        with open(displaced_file(), "r", encoding="utf-8") as handle:
-            loaded = json.load(handle)
-    except (OSError, ValueError):
-        return {}
-    return loaded if isinstance(loaded, dict) else {}
+    return read_json(displaced_file())
 
 
 def _save(remembered):
-    path = displaced_file()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(remembered, handle, indent=2, sort_keys=True)
+    """Raises OSError: forgetting these would cost somebody their Print key."""
+    write_json(displaced_file(), remembered)
 
 
 def _schema_exists(schema):

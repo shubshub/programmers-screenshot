@@ -6,7 +6,6 @@ captured until the Capture button (or Enter) says so; until then the tools
 just build up a scene.
 """
 
-import cairo
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -17,7 +16,7 @@ from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 from . import capture, painting, preferences, theme, toolbar as toolbar_module
 from .geometry import Rect, circle_touches, union
 from .actions import SetRegion
-from .scene import Scene
+from .render import Renderer
 from .settings import SettingValues
 
 HINT = "Drag to mark a region  ·  Enter or Capture takes it  ·  Esc to cancel"
@@ -41,35 +40,23 @@ def _shift_held(event):
     return bool(event.state & Gdk.ModifierType.SHIFT_MASK)
 
 
-class Canvas:
-    """What a tool needs in order to paint itself onto the overlay.
-
-    The scene is here so a preview can depend on what has already been placed
-    — a step counter has to show the number it is about to take.
-    """
-
-    def __init__(self, surface, bounds, scale, scene):
-        self.surface = surface
-        self.bounds = bounds
-        self.scale = scale
-        self.scene = scene
-
-
 class Overlay:
     """Runs a modal session and returns the captured pixbuf, or None."""
 
     def __init__(self, pixbuf, bounds, tools):
+        # Everything about turning marks into a picture lives in the renderer;
+        # this class is the window, the pointer and the toolbars around it.
+        self.renderer = Renderer(pixbuf, bounds)
         self.pixbuf = pixbuf
         self.bounds = bounds
-        self.scale = capture.pixel_scale(pixbuf, bounds)
+        self.scale = self.renderer.scale
+        self.scene = self.renderer.scene
 
         self.tools = tools
         self.active_tool = tools[0]
-        self.scene = Scene()
         self.values = SettingValues()
 
         self.result = None
-        self._surface = None
         self.pointer = None
         self._dragging = False
         self._pressed_button = None
@@ -150,18 +137,12 @@ class Overlay:
 
     @property
     def surface(self):
-        """The frozen screen as a cairo surface.
-
-        Made on demand rather than at realize time, so that rendering does not
-        depend on the window having been mapped first.
-        """
-        if self._surface is None:
-            self._surface = Gdk.cairo_surface_create_from_pixbuf(self.pixbuf, 1, None)
-        return self._surface
+        """The frozen screen as a cairo surface."""
+        return self.renderer.surface
 
     def _on_realize(self, widget):
         # Remake it against the window, which lets X keep it server-side.
-        self._surface = Gdk.cairo_surface_create_from_pixbuf(
+        self.renderer.surface = Gdk.cairo_surface_create_from_pixbuf(
             self.pixbuf, 1, widget.get_window()
         )
         self._set_cursor("crosshair")
@@ -205,13 +186,13 @@ class Overlay:
         self.window.destroy()
 
     def canvas(self):
-        return Canvas(self.surface, self.bounds, self.scale, self.scene)
+        return self.renderer.canvas()
 
     # -- intent ------------------------------------------------------------
 
     def capture_region(self):
         """What Capture would take: the region, or everything."""
-        return self.scene.region or Rect(0, 0, self.bounds.width, self.bounds.height)
+        return self.renderer.capture_region()
 
     def _capture_now(self):
         # Anything half-finished has to join the scene first: render() draws
@@ -222,28 +203,7 @@ class Overlay:
 
     def render(self):
         """Bake the frozen screen plus every annotation into a pixbuf."""
-        region = self.capture_region()
-        width = max(1, int(round(region.width * self.scale)))
-        height = max(1, int(round(region.height * self.scale)))
-
-        surface = cairo.ImageSurface(cairo.FORMAT_RGB24, width, height)
-        cr = cairo.Context(surface)
-
-        # The frozen screen is already in physical pixels, so place it in
-        # device space; the annotations are in logical pixels, so scale first.
-        cr.save()
-        cr.translate(-region.x * self.scale, -region.y * self.scale)
-        cr.set_source_surface(self.surface, 0, 0)
-        cr.paint()
-        cr.restore()
-
-        cr.scale(self.scale, self.scale)
-        cr.translate(-region.x, -region.y)
-        for item in self.scene.items:
-            item.draw(cr)
-        surface.flush()
-
-        return Gdk.pixbuf_get_from_surface(surface, 0, 0, width, height)
+        return self.renderer.render()
 
     def _opens_flyout(self, button, x, y):
         """True if the click landed on the corner marker rather than the tool."""
