@@ -1,13 +1,14 @@
 """Shared scaffolding for the headless tests.
 
 Drives the overlay's real event handlers with stand-in events, against a real
-GTK display but without ever mapping a window.
+GTK display but without ever mapping a window. `Checker` is re-exported
+from `checker`, so a suite that wants the tally and the harness both needs
+only one import.
 """
 
 import atexit
 import os
 import shutil
-import sys
 import tempfile
 import types
 
@@ -18,9 +19,7 @@ gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk  # noqa: E402
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
-)
+from checker import Checker  # noqa: E402, F401
 
 from programmers_screenshot import preferences, state, theme  # noqa: E402
 
@@ -38,28 +37,6 @@ atexit.register(shutil.rmtree, _CONFIG, ignore_errors=True)
 from programmers_screenshot import toolbar  # noqa: E402
 from programmers_screenshot.overlay import Overlay  # noqa: E402
 from programmers_screenshot.tools import build_tools  # noqa: E402
-
-
-class Checker:
-    """Prints a running tally and remembers what failed."""
-
-    def __init__(self):
-        self.failures = []
-
-    def section(self, title):
-        print("\n%s" % title)
-
-    def __call__(self, name, condition, detail=""):
-        # detail may be a tuple (a colour, a size); wrap it so % does not
-        # treat it as an argument list.
-        suffix = "  [%s]" % (detail,) if detail != "" and detail is not None else ""
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name, suffix))
-        if not condition:
-            self.failures.append(name)
-
-    def report(self):
-        print("\n%d failure(s)" % len(self.failures))
-        return 1 if self.failures else 0
 
 
 def event(x, y, button=1, shift=False):

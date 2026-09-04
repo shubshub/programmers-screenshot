@@ -311,7 +311,8 @@ def load_input(path):
     try:
         pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
     except GLib.Error as error:
-        raise capture.CaptureError("cannot read %s: %s" % (path, error.message))
+        raise capture.CaptureError(
+            "cannot read %s: %s" % (path, error.message)) from error
     return pixbuf, Rect(0, 0, pixbuf.get_width(), pixbuf.get_height())
 
 

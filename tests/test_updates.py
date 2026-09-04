@@ -7,24 +7,19 @@ what the program does with an answer rather than whether GitHub is up.
     python3 tests/test_updates.py
 """
 
-import json
 import os
 import shutil
 import sys
 import tempfile
 import time
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, os.pardir)
-sys.path.insert(0, os.path.join(ROOT, "src"))
-sys.path.insert(0, HERE)
-
-import gi  # noqa: E402
+import gi
 
 gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gtk  # noqa: E402
 
+from checker import Checker  # noqa: E402
 from programmers_screenshot import alerts, state, updates  # noqa: E402
 
 CHANGELOG = """\
@@ -42,24 +37,6 @@ programmers-screenshot (0.20.0) noble; urgency=medium
 
  -- Shubshub  Tue, 04 Aug 2026 14:20:00 +1200
 """
-
-
-class Checker:
-    def __init__(self):
-        self.failures = []
-
-    def section(self, title):
-        print("\n%s" % title)
-
-    def __call__(self, name, condition, detail=""):
-        suffix = "  [%s]" % (detail,) if detail != "" and detail is not None else ""
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name, suffix))
-        if not condition:
-            self.failures.append(name)
-
-    def report(self):
-        print("\n%d failure(s)" % len(self.failures))
-        return 1 if self.failures else 0
 
 
 def main():
@@ -136,7 +113,7 @@ def main():
         check("wrapped lines are joined up",
               lines[0].endswith("under Ink."), lines[0])
         check("it stops at the next version",
-              all("palette" not in l for l in lines), lines)
+              all("palette" not in line for line in lines), lines)
         check("an absent version gives nothing",
               updates.entry_for("9.9.9", CHANGELOG) == [])
 

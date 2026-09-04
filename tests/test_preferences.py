@@ -15,41 +15,16 @@ import sys
 import tempfile
 import types
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, os.pardir)
-sys.path.insert(0, os.path.join(ROOT, "src"))
-
-import gi  # noqa: E402
+import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk, Gtk  # noqa: E402
 
-sys.path.insert(0, HERE)
-
-from support import Harness  # noqa: E402
+from support import Checker, Harness  # noqa: E402
 
 from programmers_screenshot import capture, cli, preferences  # noqa: E402
-
-
-class Checker:
-    def __init__(self):
-        self.failures = []
-
-    def section(self, title):
-        print("\n%s" % title)
-
-    def __call__(self, name, condition, detail=""):
-        # (detail,) so a tuple detail is one argument, not an argument list.
-        suffix = "  [%s]" % (detail,) if detail != "" and detail is not None else ""
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name, suffix))
-        if not condition:
-            self.failures.append(name)
-
-    def report(self):
-        print("\n%d failure(s)" % len(self.failures))
-        return 1 if self.failures else 0
 
 
 def options(**overrides):

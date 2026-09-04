@@ -227,7 +227,7 @@ def load(source):
             with open(source, "r", encoding="utf-8") as handle:
                 text = handle.read()
     except OSError as error:
-        raise RecipeError("cannot read the recipe: %s" % error)
+        raise RecipeError("cannot read the recipe: %s" % error) from error
     return parse(text)
 
 
@@ -235,7 +235,7 @@ def parse(text):
     try:
         spec = json.loads(text)
     except ValueError as error:
-        raise RecipeError("the recipe is not valid JSON: %s" % error)
+        raise RecipeError("the recipe is not valid JSON: %s" % error) from error
     if not isinstance(spec, dict):
         raise RecipeError("the recipe should be a JSON object, with %s in it"
                           % ", ".join(KEYS))
@@ -281,8 +281,9 @@ def numbers(value, count, where):
             )
         try:
             value = [float(part) for part in parts]
-        except ValueError:
-            raise RecipeError("%s: those are not all numbers: %r" % (where, value))
+        except ValueError as error:
+            raise RecipeError(
+                "%s: those are not all numbers: %r" % (where, value)) from error
     return _numbers(value, count, where)
 
 

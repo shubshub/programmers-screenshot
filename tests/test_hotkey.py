@@ -14,6 +14,8 @@ import subprocess
 import sys
 import tempfile
 
+from checker import Checker
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, os.pardir)
 
@@ -62,24 +64,6 @@ print("@@" + json.dumps(result))
 '''
 
 
-class Checker:
-    def __init__(self):
-        self.failures = []
-
-    def section(self, title):
-        print("\n%s" % title)
-
-    def __call__(self, name, condition, detail=""):
-        suffix = "  [%s]" % (detail,) if detail != "" and detail is not None else ""
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name, suffix))
-        if not condition:
-            self.failures.append(name)
-
-    def report(self):
-        print("\n%d failure(s)" % len(self.failures))
-        return 1 if self.failures else 0
-
-
 def main():
     check = Checker()
     config = tempfile.mkdtemp(prefix="programmers-screenshot-hotkey-")
@@ -95,7 +79,8 @@ def main():
             timeout=90,
             env=environment,
         )
-        line = [l for l in finished.stdout.splitlines() if l.startswith("@@")]
+        line = [text for text in finished.stdout.splitlines()
+                if text.startswith("@@")]
         if not line:
             print(finished.stdout)
             print(finished.stderr)

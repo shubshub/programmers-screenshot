@@ -4,7 +4,6 @@
     python3 tests/test_pixelate_tool.py
 """
 
-import os
 import sys
 
 import gi
@@ -13,17 +12,10 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 
-from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gi.repository import GdkPixbuf, GLib, Gtk  # noqa: E402
 
 from support import Checker, Harness, pixel  # noqa: E402
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
-)
-
-from programmers_screenshot import capture  # noqa: E402
 from programmers_screenshot.actions import SetRegion  # noqa: E402
 from programmers_screenshot.geometry import Rect  # noqa: E402
 from programmers_screenshot.tools.pixelate import BLOCK, Pixelation  # noqa: E402

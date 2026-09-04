@@ -8,7 +8,6 @@ the framework has failed its purpose.
     python3 tests/test_framework.py
 """
 
-import os
 import sys
 
 import gi
@@ -18,13 +17,7 @@ gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk, Gtk  # noqa: E402
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 from support import Checker, Harness, pixel, render_overlay  # noqa: E402
-
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
-)
 
 from programmers_screenshot import capture, theme, toolbar  # noqa: E402
 from programmers_screenshot.actions import AddItem, SetRegion  # noqa: E402

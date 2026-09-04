@@ -6,6 +6,7 @@ and uninstalling gives it back — otherwise removing our shortcut would leave
 the user permanently without their Print Screen key and no clue why.
 """
 
+import contextlib
 import json
 import os
 import sys
@@ -168,10 +169,8 @@ def _save(remembered):
 
 
 def _forget():
-    try:
+    with contextlib.suppress(OSError):
         os.unlink(displaced_file())
-    except OSError:
-        pass
 
 
 def _schema_exists(schema):

@@ -14,35 +14,14 @@ import stat
 import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, os.pardir)
-sys.path.insert(0, os.path.join(ROOT, "src"))
-
-import gi  # noqa: E402
+import gi
 
 gi.require_version("GdkPixbuf", "2.0")
 
 from gi.repository import GdkPixbuf, GLib  # noqa: E402
 
+from checker import Checker  # noqa: E402
 from programmers_screenshot import capture, output  # noqa: E402
-
-
-class Checker:
-    def __init__(self):
-        self.failures = []
-
-    def section(self, title):
-        print("\n%s" % title)
-
-    def __call__(self, name, condition, detail=""):
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name,
-                           ("  [%s]" % detail) if detail else ""))
-        if not condition:
-            self.failures.append(name)
-
-    def report(self):
-        print("\n%d failure(s)" % len(self.failures))
-        return 1 if self.failures else 0
 
 
 def a_pixbuf():

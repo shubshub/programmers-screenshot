@@ -420,6 +420,8 @@ to a core module to pass, the framework has stopped doing its job.
 ### Tests
 
 ```bash
+python3 tests/run.py                  # every suite, one process each
+
 python3 tests/test_framework.py       # scene, settings, tools, adding a tool
 python3 tests/test_interaction.py     # overlay: mark out, confirm, cancel
 python3 tests/test_highlighter.py     # the wash, on light and dark
@@ -438,8 +440,9 @@ python3 tests/test_sound.py           # the sound asset, generator and playback
 ```
 
 They run against a real display but never show a window, and never make a
-noise. `tests/support.py` holds the shared harness. The two notification
-actions talk to the desktop, so they are left to manual testing.
+noise. `tests/support.py` holds the shared harness, `tests/checker.py` the
+tally every suite prints, and `tests/run.py` runs the lot. The two
+notification actions talk to the desktop, so they are left to manual testing.
 
 ## Licence
 

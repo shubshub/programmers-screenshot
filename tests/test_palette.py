@@ -7,16 +7,10 @@ section checks that nothing moved for anyone who does not turn this on.
     python3 tests/test_palette.py
 """
 
-import os
 import sys
 import types
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, os.pardir)
-sys.path.insert(0, os.path.join(ROOT, "src"))
-sys.path.insert(0, HERE)
-
-import gi  # noqa: E402
+import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
