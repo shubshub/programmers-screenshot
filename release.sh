@@ -38,7 +38,7 @@ bad()   { printf '  FAIL  %s\n' "$*"; problems=$((problems + 1)); }
 note()  { printf '  --    %s\n' "$*"; }
 
 # --- 1. what are we releasing ----------------------------------------------
-VERSION="$(sed -n 's/^VERSION="\(.*\)"$/\1/p' build.sh)"
+VERSION="$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' src/programmers_screenshot/cli.py)"
 step "Releasing $PACKAGE $VERSION"
 
 # --- 2. the tree is in a fit state ------------------------------------------
@@ -71,13 +71,14 @@ fi
 
 # --- 3. the version agrees with itself --------------------------------------
 step "Version consistency"
-check_version() {
-    if grep -q "$2" "$1"; then ok "$1"; else bad "$1 does not mention $VERSION"; fi
-}
-check_version src/programmers_screenshot/cli.py "VERSION = \"$VERSION\""
-check_version packaging/programmers-screenshot.1 "$PACKAGE $VERSION"
-check_version README.md "${PACKAGE}_${VERSION}_all.deb"
-check_version packaging/changelog "($VERSION)"
+# The man page and the README no longer carry the number -- build.sh puts it
+# into the one and the other points at the Releases page -- so the changelog
+# is the only place left that has to be kept in step by hand.
+if grep -q "($VERSION)" packaging/changelog; then
+    ok "packaging/changelog"
+else
+    bad "packaging/changelog has no entry for $VERSION"
+fi
 
 # --- 4. it does what it says ------------------------------------------------
 step "Tests"
@@ -141,6 +142,13 @@ if man --warnings -l "$STAGE/usr/share/man/man1/$PACKAGE.1.gz" >/dev/null 2>&1; 
 else
     bad "man page has warnings"
 fi
+
+# Generated now, so worth checking the substitution actually happened.
+titled="$(gzip -dc "$STAGE/usr/share/man/man1/$PACKAGE.1.gz" | head -1)"
+case "$titled" in
+    *"$PACKAGE $VERSION"*) ok "man page says $VERSION" ;;
+    *) bad "man page title line says: $titled" ;;
+esac
 
 if desktop-file-validate "$STAGE/usr/share/applications/$PACKAGE.desktop" 2>/dev/null; then
     ok "desktop entry valid"
