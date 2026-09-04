@@ -230,11 +230,8 @@ def _grab_from_gnome_shell():
     except GLib.Error:
         return None
     finally:
-        _unlink(path)
+        with contextlib.suppress(OSError):
+            os.unlink(path)
         if written_to and written_to != path:
-            _unlink(written_to)
-
-
-def _unlink(path):
-    with contextlib.suppress(OSError):
-        os.unlink(path)
+            with contextlib.suppress(OSError):
+                os.unlink(written_to)

@@ -4,9 +4,10 @@ Distinct from settings.py: those are the per-tool knobs on the second toolbar
 row, chosen per gesture and forgotten when the overlay closes. These outlive
 the session and live in a file.
 
-The only preference so far is a stored default for --no-save and --directory,
-which already worked from the command line. A flag always beats what is
-stored here; see cli.apply_preferences.
+Six of them: whether a capture is saved and to which folder, how the toolbar
+is presented and where the palette was last dropped, whether GitHub is asked
+about new releases, and whether a recipe may take a shot with nobody
+watching. A flag always beats what is stored here; see cli.with_preferences.
 """
 
 import json

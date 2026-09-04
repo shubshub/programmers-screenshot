@@ -63,7 +63,7 @@ def main():
 
     button = h.button(TOOL, "line")
     h.bar.open_flyout(button)
-    shapes = [b.value for b in h.bar.flyout[2]]
+    shapes = [b.value for b in h.bar.flyout.buttons]
     check("four shapes offered in the flyout",
           shapes == ["line", "box", "circle", "arrow"], shapes)
     h.bar.flyout = None

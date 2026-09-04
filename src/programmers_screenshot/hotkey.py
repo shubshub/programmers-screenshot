@@ -148,7 +148,8 @@ def _restore():
         Gio.Settings.new(schema).set_strv(key, value)
         restored.append((schema, key))
     if remembered:
-        _forget()
+        with contextlib.suppress(OSError):
+            os.unlink(displaced_file())
     return restored
 
 
@@ -166,11 +167,6 @@ def _save(remembered):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(remembered, handle, indent=2, sort_keys=True)
-
-
-def _forget():
-    with contextlib.suppress(OSError):
-        os.unlink(displaced_file())
 
 
 def _schema_exists(schema):

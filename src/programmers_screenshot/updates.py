@@ -184,7 +184,7 @@ def entry_for(version, text):
     return lines
 
 
-def upgrade_notice(current, bullets=None):
+def upgrade_notice(current):
     """What to say about having been upgraded to `current`, or None.
 
     Silent on a first install -- a changelog for versions you never ran is
@@ -199,8 +199,7 @@ def upgrade_notice(current, bullets=None):
         return None
     # All of them. A notification body had to be trimmed to fit; a window
     # scrolls, so there is no reason to hide half of what changed.
-    shown = lines if bullets is None else lines[:bullets]
-    return ("Updated to %s" % current, "\n\n".join("• " + line for line in shown))
+    return ("Updated to %s" % current, "\n\n".join("• " + line for line in lines))
 
 
 def announce_upgrade(current):

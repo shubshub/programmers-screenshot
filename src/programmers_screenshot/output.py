@@ -57,14 +57,32 @@ def save(pixbuf, directory=None, output=None):
         os.chmod(temporary, FILE_MODE)  # mkstemp gives 0600; savev may not keep it
         os.replace(temporary, path)
     except BaseException:
-        _discard(temporary)
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
         raise
     return path
 
 
-def _discard(path):
-    with contextlib.suppress(OSError):
-        os.unlink(path)
+def _pipe_to_helper(helper, data):
+    """Hand the bytes to a clipboard helper. False if it did not take them.
+
+    The helper is a separate program: it can be missing a library, refuse to
+    start, or close the pipe early, and a broken pipe is an OSError like any
+    other. By the time this runs the PNG is saved and its path printed, so a
+    failure here is not worth a traceback — the caller falls back instead.
+    """
+    try:
+        process = subprocess.Popen(
+            helper,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        process.stdin.write(data)
+        process.stdin.close()  # closing the pipe is what releases the helper
+    except OSError:
+        return False
+    return True
 
 
 def copy_to_clipboard(pixbuf):
@@ -72,20 +90,13 @@ def copy_to_clipboard(pixbuf):
 
     xclip and wl-copy read stdin, then fork and keep serving the selection
     after we exit — something a plain GTK clipboard owner cannot do. The GTK
-    path is only a fallback for when neither helper is installed.
+    path is the fallback for when neither helper is installed, and for when
+    the one that is will not take the image.
     """
     helper = _clipboard_helper()
     if helper:
         succeeded, data = pixbuf.save_to_bufferv("png", [], [])
-        if succeeded:
-            process = subprocess.Popen(
-                helper,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            process.stdin.write(data)
-            process.stdin.close()  # closing the pipe is what releases the helper
+        if succeeded and _pipe_to_helper(helper, data):
             return True
     return _copy_via_gtk(pixbuf)
 
@@ -97,19 +108,8 @@ def copy_text(text):
     afterwards replaces whatever was copied.
     """
     helper = _clipboard_helper(image=False)
-    if helper:
-        try:
-            process = subprocess.Popen(
-                helper,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            process.stdin.write(text.encode("utf-8"))
-            process.stdin.close()
-            return True
-        except OSError:
-            pass
+    if helper and _pipe_to_helper(helper, text.encode("utf-8")):
+        return True
 
     clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
     clipboard.set_text(text, -1)

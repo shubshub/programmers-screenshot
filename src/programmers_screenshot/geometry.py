@@ -45,6 +45,16 @@ class Rect:
     def translated(self, dx, dy):
         return Rect(self.x + dx, self.y + dy, self.width, self.height)
 
+    def grown(self, pad):
+        """This rectangle, `pad` larger on every side.
+
+        What a bounds() wants: the mark, plus however far its stroke, its
+        head or its label overhangs it.
+        """
+        return Rect(
+            self.x - pad, self.y - pad, self.width + pad * 2, self.height + pad * 2
+        )
+
     def scaled(self, factor):
         return Rect(
             self.x * factor, self.y * factor, self.width * factor, self.height * factor
@@ -54,14 +64,6 @@ class Rect:
         """Snap to whole pixels, keeping the edges where they were."""
         left, top = round(self.x), round(self.y)
         return Rect(left, top, round(self.right) - left, round(self.bottom) - top)
-
-    def clipped_to(self, other):
-        x = max(self.x, other.x)
-        y = max(self.y, other.y)
-        return Rect(
-            x, y, max(0, min(self.right, other.right) - x),
-            max(0, min(self.bottom, other.bottom) - y)
-        )
 
     def __bool__(self):
         return self.width > 0 and self.height > 0

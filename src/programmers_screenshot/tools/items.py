@@ -108,11 +108,15 @@ class Stroke(Item):
         self.colour = colour
         self.width = width
 
+    def _ink(self):
+        """The colour to lay down. The highlighter thins it."""
+        return self.colour
+
     def paint(self, cr):
         if not self.points:
             return
         cr.save()
-        painting.use(cr, self.colour)
+        painting.use(cr, self._ink())
         cr.set_line_width(self.width)
         cr.set_line_cap(cairo.LINE_CAP_ROUND)
         cr.set_line_join(cairo.LINE_JOIN_ROUND)
@@ -133,13 +137,8 @@ class Stroke(Item):
             return None
         xs = [x for x, _ in self.points]
         ys = [y for _, y in self.points]
-        pad = self.width / 2 + 1
-        return Rect(
-            min(xs) - pad,
-            min(ys) - pad,
-            max(xs) - min(xs) + pad * 2,
-            max(ys) - min(ys) + pad * 2,
-        )
+        box = Rect.from_points((min(xs), min(ys)), (max(xs), max(ys)))
+        return box.grown(self.width / 2 + 1)
 
 
 class Measurement(Item):
@@ -199,17 +198,11 @@ class Measurement(Item):
         painting.draw_label(cr, text, box)
 
     def bounds(self):
-        (x0, y0), (x1, y1) = self.start, self.end
-        pad = 40  # the ticks, and the readout sitting over the middle
-        return Rect(
-            min(x0, x1) - pad,
-            min(y0, y1) - pad,
-            abs(x1 - x0) + pad * 2,
-            abs(y1 - y0) + pad * 2,
-        )
+        # 40: the ticks, and the readout sitting over the middle.
+        return Rect.from_points(self.start, self.end).grown(40)
 
 
-class Highlight(Item):
+class Highlight(Stroke):
     """A marker stroke: a wash of colour that tints without hiding.
 
     Translucent rather than multiplied. Multiply is what a real highlighter
@@ -226,39 +219,8 @@ class Highlight(Item):
 
     ALPHA = 0.45
 
-    def __init__(self, points, colour, width):
-        self.points = tuple(points)
-        self.colour = colour
-        self.width = width
-
-    def paint(self, cr):
-        if not self.points:
-            return
-        cr.save()
-        painting.use(cr, tuple(self.colour[:3]) + (self.ALPHA,))
-        cr.set_line_width(self.width)
-        cr.set_line_cap(cairo.LINE_CAP_ROUND)
-        cr.set_line_join(cairo.LINE_JOIN_ROUND)
-        cr.move_to(*self.points[0])
-        if len(self.points) == 1:
-            cr.line_to(*self.points[0])  # round cap on a zero-length line: a dot
-        for point in self.points[1:]:
-            cr.line_to(*point)
-        cr.stroke()
-        cr.restore()
-
-    def bounds(self):
-        xs = [x for x, _ in self.points]
-        ys = [y for _, y in self.points]
-        if not xs:
-            return None
-        pad = self.width / 2 + 1
-        return Rect(
-            min(xs) - pad,
-            min(ys) - pad,
-            max(xs) - min(xs) + pad * 2,
-            max(ys) - min(ys) + pad * 2,
-        )
+    def _ink(self):
+        return tuple(self.colour[:3]) + (self.ALPHA,)
 
 
 class Shape(Item):
@@ -277,13 +239,7 @@ class Shape(Item):
         cr.set_line_join(cairo.LINE_JOIN_ROUND)
 
     def _padded(self, pad):
-        (x0, y0), (x1, y1) = self.start, self.end
-        return Rect(
-            min(x0, x1) - pad,
-            min(y0, y1) - pad,
-            abs(x1 - x0) + pad * 2,
-            abs(y1 - y0) + pad * 2,
-        )
+        return Rect.from_points(self.start, self.end).grown(pad)
 
     def bounds(self):
         return self._padded(self.width / 2 + 1)
