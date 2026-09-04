@@ -83,7 +83,7 @@ def spawn_detached(arguments):
 def _spawn_agent(path):
     """Start the detached agent for a captured file.
 
-    Kept separate from show_notice(): this one has two actions, and showing a
+    Kept separate from show_simple(): this one has two actions, and showing a
     file in its folder goes over D-Bus to the file manager rather than being
     a URI anything can open.
     """

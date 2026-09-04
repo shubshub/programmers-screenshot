@@ -1,5 +1,7 @@
 """Freehand drawing."""
 
+import cairo
+
 from .. import painting
 from ..settings import COLOUR, WIDTH
 from .base import Tool
@@ -54,7 +56,7 @@ class PenTool(Tool):
         """A nib on a diagonal shaft."""
         painting.use(cr, colour)
         cr.set_line_width(1.8)
-        cr.set_line_cap(1)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
         left, top = box.x + 9, box.y + 9
         right, bottom = box.x + box.width - 9, box.y + box.height - 9
         cr.move_to(left, bottom)

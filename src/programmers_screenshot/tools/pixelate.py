@@ -70,9 +70,7 @@ class Pixelation(Item):
         cr.restore()
 
     def bounds(self):
-        return Rect(
-            self.rect.x - 1, self.rect.y - 1, self.rect.width + 2, self.rect.height + 2
-        )
+        return self.rect.grown(1)
 
 
 def shrink(canvas, rect, block):

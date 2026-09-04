@@ -11,6 +11,8 @@ come out as sharp in the captured PNG as they look on screen. See
 Item.draw().
 """
 
+import math
+
 from .. import painting, theme
 from ..actions import Compound, RemoveItem, ReplaceItem
 from ..geometry import Rect, circle_touches, union
@@ -167,7 +169,7 @@ class EraserTool(DragTool):
         painting.use(cr, theme.SWATCH_RING)
         cr.set_line_width(1.0)
         cr.new_sub_path()
-        cr.arc(end[0], end[1], radius, 0, 6.2831853)
+        cr.arc(end[0], end[1], radius, 0, 2 * math.pi)
         cr.stroke()
 
     def drag_extent(self, start, end, values):

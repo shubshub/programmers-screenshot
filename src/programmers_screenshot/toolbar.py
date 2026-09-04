@@ -4,8 +4,15 @@ Two rows. The first holds the tools on the left and capture on the right. The
 second appears only while the active tool declares settings, and is laid out
 from what the settings say about themselves — it knows nothing about which
 tool it is serving.
+
+Toolbars, above them, holds one bar per monitor and keeps them in step, so
+the overlay can talk to the lot as though there were one. PaletteToolbar is
+the same controls in a rectangle you drag around instead: the tools in a
+grid rather than a row, and one of it however many screens there are.
 """
 
+import collections
+import math
 from dataclasses import dataclass
 
 from . import painting, theme
@@ -17,10 +24,13 @@ CANCEL = "cancel"
 SETTINGS = "settings"   # the preferences window
 SETTING = "setting"    # one knob on the second row
 VARIANT = "variant"    # a sub-tool, offered in a flyout
-FLYOUT = "flyout"      # the marker on a button that opens one
 
 BAR = "bar"
 PALETTE = "palette"
+
+#: An open sub-tool flyout: the button it hangs off, the panel, and what
+#: is in it.
+Flyout = collections.namedtuple("Flyout", "button rect buttons")
 
 
 class Toolbars:
@@ -55,9 +65,6 @@ class Toolbars:
         """True if this point is the palette's drag handle."""
         palette = self.palette
         return palette is not None and palette.grab_rect.contains(x, y)
-
-    def move_palette(self, x, y):
-        self.palette.move_to(x, y)
 
     def shown(self, button):
         """Which tool a button stands for right now."""
@@ -148,6 +155,8 @@ class Toolbar:
 
     def __init__(self, tools, monitor, values, origin=None, chosen=None,
                  monitors=None):
+        #: The tools this bar offers, ungrouped. Layout works from entries;
+        #: this is what the suite reads to check every bar shows the same list.
         self.tools = tools
         self.entries = grouped(tools)
         self.values = values
@@ -158,7 +167,7 @@ class Toolbar:
         self.settings_rect = None
         self.setting_buttons = []
         self.hovered = None
-        #: (button, rect, buttons) while a sub-tool flyout is open.
+        #: A Flyout while a sub-tool flyout is open, None the rest of the time.
         self.flyout = None
         self.place(origin)
         self.show_settings_for(tools[0] if tools else None)
@@ -261,13 +270,13 @@ class Toolbar:
             return True
         if self.settings_rect is not None and self.settings_rect.contains(x, y):
             return True
-        return self.flyout is not None and self.flyout[1].contains(x, y)
+        return self.flyout is not None and self.flyout.rect.contains(x, y)
 
     def button_at(self, x, y):
         # The flyout first: it is drawn over everything else, so it has to be
         # hit before whatever it is covering.
         if self.flyout is not None:
-            for button in self.flyout[2]:
+            for button in self.flyout.buttons:
                 if button.rect.contains(x, y):
                     return button
         for button in self.buttons + self.setting_buttons:
@@ -337,18 +346,17 @@ class Toolbar:
             else:
                 buttons.append(Button(VARIANT, spot, tool=button.tool,
                                       setting=setting, value=option))
-        self.flyout = (button, rect, buttons)
+        self.flyout = Flyout(button, rect, buttons)
 
     def draw_flyout(self, cr):
         if self.flyout is None:
             return
-        _button, rect, buttons = self.flyout
-        painting.fill_rounded(cr, rect, theme.SETTINGS_BG, 5)
+        painting.fill_rounded(cr, self.flyout.rect, theme.SETTINGS_BG, 5)
         painting.use(cr, theme.BAR_EDGE)
         cr.set_line_width(1.0)
-        painting.rounded_rect(cr, rect, 5)
+        painting.rounded_rect(cr, self.flyout.rect, 5)
         cr.stroke()
-        for button in buttons:
+        for button in self.flyout.buttons:
             if button is self.hovered:
                 painting.fill_rounded(cr, button.rect, theme.BUTTON_HOVER, 4)
             if button.setting is None:
@@ -433,15 +441,7 @@ class Toolbar:
         cr.rectangle(self.rect.x, self.rect.y, self.rect.width, self.rect.height)
         cr.fill()
 
-        for button in self.buttons:
-            if button.kind == TOOL:
-                self._draw_tool(cr, button, button.tool is active_tool)
-            elif button.kind == CAPTURE:
-                self._draw_capture(cr, button)
-            elif button.kind == SETTINGS:
-                self._draw_settings_button(cr, button)
-            else:
-                self._draw_cancel(cr, button)
+        self._draw_buttons(cr, active_tool)
 
         if self.settings_rect is not None:
             self._draw_settings(cr)
@@ -454,6 +454,18 @@ class Toolbar:
         cr.move_to(self.rect.x, bottom - 0.5)
         cr.line_to(self.rect.right, bottom - 0.5)
         cr.stroke()
+
+    def _draw_buttons(self, cr, active_tool):
+        """Every button on this bar, each drawn as whatever kind it is."""
+        for button in self.buttons:
+            if button.kind == TOOL:
+                self._draw_tool(cr, button, button.tool is active_tool)
+            elif button.kind == CAPTURE:
+                self._draw_capture(cr, button)
+            elif button.kind == SETTINGS:
+                self._draw_settings_button(cr, button)
+            else:
+                self._draw_cancel(cr, button)
 
     def _draw_tool(self, cr, button, active):
         if active:
@@ -574,7 +586,7 @@ class PaletteToolbar(Toolbar):
         pad = theme.PALETTE_PADDING
         step = theme.TOOL_BUTTON + theme.TOOL_GAP
         columns = theme.PALETTE_COLUMNS
-        rows = -(-len(self.entries) // columns)  # ceiling division
+        rows = self._rows()
 
         width = pad * 2 + columns * step - theme.TOOL_GAP
         grid_height = rows * step - theme.TOOL_GAP
@@ -584,6 +596,10 @@ class PaletteToolbar(Toolbar):
         x, y = origin if origin else self._default_origin(width)
         self.rect = self._clamped(Rect(x, y, width, height))
         self.buttons = self._layout_tools()
+
+    def _rows(self):
+        """How many rows of tools the grid comes to."""
+        return math.ceil(len(self.entries) / theme.PALETTE_COLUMNS)
 
     def _default_origin(self, width):
         """Top left of the monitor, in far enough not to look like an accident."""
@@ -636,7 +652,7 @@ class PaletteToolbar(Toolbar):
         """Put the palette here, then rebuild everything that sat on it."""
         self.rect = self._clamped(Rect(x, y, self.rect.width, self.rect.height))
         self.buttons = self._layout_tools()
-        active = self.flyout[0].tool if self.flyout else None
+        active = self.flyout.button.tool if self.flyout else None
         self.flyout = None
         self._relayout_settings()
         return active
@@ -660,7 +676,7 @@ class PaletteToolbar(Toolbar):
                 members=members if len(members) > 1 else None,
             ))
 
-        rows = -(-len(self.entries) // theme.PALETTE_COLUMNS)
+        rows = self._rows()
         bottom = (self.rect.y + theme.PALETTE_GRAB + pad
                   + rows * step - theme.TOOL_GAP + theme.PALETTE_ROW_GAP)
         square = theme.CAPTURE_HEIGHT
@@ -690,7 +706,7 @@ class PaletteToolbar(Toolbar):
         self._relayout_settings()
 
     def _relayout_settings(self):
-        settings = getattr(self, "_settings_for", ())
+        settings = self._settings_for
         if not settings:
             self.settings_rect = None
             self.setting_buttons = []
@@ -717,25 +733,17 @@ class PaletteToolbar(Toolbar):
                 x += width + theme.SETTINGS_OPTION_GAP
 
     def draw(self, cr, active_tool):
-        painting.fill_rounded(cr, self._whole(), theme.BAR_BG, 6)
+        painting.fill_rounded(cr, self.whole(), theme.BAR_BG, 6)
         self._draw_grab(cr)
-        for button in self.buttons:
-            if button.kind == TOOL:
-                self._draw_tool(cr, button, button.tool is active_tool)
-            elif button.kind == CAPTURE:
-                self._draw_capture(cr, button)
-            elif button.kind == SETTINGS:
-                self._draw_settings_button(cr, button)
-            else:
-                self._draw_cancel(cr, button)
+        self._draw_buttons(cr, active_tool)
         if self.settings_rect is not None:
             self._draw_settings(cr)
         painting.use(cr, theme.BAR_EDGE)
         cr.set_line_width(1.0)
-        painting.rounded_rect(cr, self._whole(), 6)
+        painting.rounded_rect(cr, self.whole(), 6)
         cr.stroke()
 
-    def _whole(self):
+    def whole(self):
         """The palette and its settings block, as one rounded rectangle."""
         if self.settings_rect is None:
             return self.rect
@@ -764,7 +772,7 @@ class PaletteToolbar(Toolbar):
         # can be dragged to another, and a tooltip clamped to the wrong one
         # lands nowhere near its button.
         screen = self.current_monitor()
-        whole = self._whole()
+        whole = self.whole()
         y = whole.bottom + theme.TOOLTIP_GAP
         if y + box_height > screen.bottom:
             y = whole.y - theme.TOOLTIP_GAP - box_height

@@ -85,8 +85,8 @@ class Step(Item):
 
     def bounds(self):
         x, y = self.centre
-        reach = self.radius + 2
-        return Rect(x - reach, y - reach, reach * 2, reach * 2)
+        box = Rect(x - self.radius, y - self.radius, self.radius * 2, self.radius * 2)
+        return box.grown(2)
 
 
 def steps(scene):

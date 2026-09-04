@@ -1,5 +1,7 @@
 """A marker pen: a translucent wash that tints without hiding."""
 
+import cairo
+
 from .. import painting
 from ..settings import ColourSetting, WidthSetting
 from .items import Highlight
@@ -46,7 +48,7 @@ class HighlighterTool(PenTool):
         """A chisel tip on a diagonal, wider than the pen's nib."""
         painting.use(cr, colour)
         cr.set_line_width(5.0)
-        cr.set_line_cap(0)  # butt, so it reads as a flat chisel
+        cr.set_line_cap(cairo.LINE_CAP_BUTT)  # reads as a flat chisel
         cr.move_to(box.x + 9, box.bottom - 8)
         cr.line_to(box.right - 10, box.y + 9)
         cr.stroke()
