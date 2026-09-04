@@ -8,6 +8,7 @@ tools, or capturing — at which point commit() hands the finished text over.
 import cairo
 
 from .. import painting, theme
+from ..actions import AddItem, Compound, RemoveItem
 from ..geometry import Rect
 from ..settings import COLOUR, ChoiceSetting
 from .base import Tool
@@ -113,15 +114,29 @@ class TextTool(Tool):
         self._origin = None
         self._lines = [""]
         self._values = {}
+        self._editing_item = None
 
     # -- gesture -----------------------------------------------------------
 
     def begin(self, point, values):
         """A press on the canvas puts the caret here. The overlay has already
         committed whatever was being typed before."""
-        self._origin = point
-        self._lines = [""]
-        self._values = values
+        original = self._topmost(point)
+        if original is None:
+            self._origin = point
+            self._lines = [""]
+            self._values = values
+            return
+
+        self._editing_item = RemoveItem(original)
+        self._editing_item.apply(self.canvas.scene)
+        self._origin = original.origin
+        self._lines = list(original.lines)
+        self._values = {
+            "text-size": original.size,
+            "text-background": original.background,
+            "colour": original.colour,
+        }
 
     def finish(self, point, shift=False):
         return None  # typing continues after the button comes up
@@ -133,6 +148,9 @@ class TextTool(Tool):
             self._values = values
 
     def cancel(self):
+        if self._editing_item is not None:
+            self._editing_item.revert(self.canvas.scene)
+        self._editing_item = None
         self._origin = None
         self._lines = [""]
 
@@ -140,8 +158,17 @@ class TextTool(Tool):
         if self._origin is None:
             return None
         block = self._block()
-        self.cancel()
-        return None if block.is_empty() else block
+        editing_item = self._editing_item
+        self._editing_item = None
+        self._origin = None
+        self._lines = [""]
+        if block.is_empty():
+            if editing_item is not None:
+                editing_item.revert(self.canvas.scene)
+            return None
+        if editing_item is not None:
+            return Compound([editing_item, AddItem(block)])
+        return block
 
     @property
     def editing(self):
@@ -224,3 +251,12 @@ class TextTool(Tool):
             self._size(),
             self._values.get("text-background", BACKGROUND.default),
         )
+
+    def _topmost(self, point):
+        """Return the topmost text block containing the click, if any."""
+        if self.canvas is None:
+            return None
+        for item in reversed(self.canvas.scene.items):
+            if isinstance(item, TextBlock) and item.bounds().contains(*point):
+                return item
+        return None
