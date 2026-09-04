@@ -1,0 +1,47 @@
+# Lint, run the suite, build the package.
+#
+# The suites drive real GTK objects against a real X display -- they never map
+# a window, but they do need a server -- so everything runs under xvfb. They
+# also read real GSettings schemas rather than stubbing them, which is why
+# three schema packages are installed: gnome-settings-daemon-common owns
+# org.gnome.settings-daemon.plugins.media-keys and gnome-shell-common owns
+# org.gnome.shell.keybindings (both looked up by the hotkey suite), and
+# gsettings-desktop-schemas owns org.gnome.desktop.sound (the sound suite).
+# alsa-utils is there for aplay: the sound suite checks that a player the
+# package recommends is actually on the machine, and the runner has none.
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deliberately no actions/setup-python: the suites import gi, which
+      # belongs to the system python3 that python3-gi installs into. Another
+      # interpreter cannot see it.
+      - name: Install the dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-gi python3-gi-cairo python3-cairo \
+            gir1.2-gtk-3.0 gir1.2-gdkpixbuf-2.0 gir1.2-notify-0.7 \
+            gir1.2-wnck-3.0 gsettings-desktop-schemas \
+            gnome-settings-daemon-common gnome-shell-common \
+            xvfb desktop-file-utils alsa-utils
+
+      # Pinned: an unrelated pull request should not go red because a new
+      # ruff release added a rule.
+      - name: Lint
+        run: pipx run --spec ruff==0.16.6 ruff check src tests
+
+      - name: Tests
+        run: xvfb-run -a python3 tests/run.py
+
+      - name: Build
+        run: ./build.sh
