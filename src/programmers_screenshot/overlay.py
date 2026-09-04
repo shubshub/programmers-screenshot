@@ -414,13 +414,13 @@ class Overlay:
     def _drag_palette(self, event):
         """Move the palette, repainting only what it left and where it landed."""
         palette = self.toolbars.palette
-        vacated = palette._whole()
+        vacated = palette.whole()
         offset_x, offset_y = self._moving_palette
         palette.move_to(event.x - offset_x, event.y - offset_y)
-        for area in (vacated, palette._whole()):
+        for area in (vacated, palette.whole()):
+            grown = area.grown(2)
             self.window.queue_draw_area(
-                int(area.x - 2), int(area.y - 2),
-                int(area.width + 4), int(area.height + 4),
+                int(grown.x), int(grown.y), int(grown.width), int(grown.height)
             )
 
     def _remember_palette(self):
@@ -533,11 +533,9 @@ class Overlay:
             return
         area = union([damage, self._last_damage] if self._last_damage else [damage])
         self._last_damage = damage
+        grown = area.grown(DAMAGE_MARGIN)
         self.window.queue_draw_area(
-            int(area.x - DAMAGE_MARGIN),
-            int(area.y - DAMAGE_MARGIN),
-            int(area.width + DAMAGE_MARGIN * 2),
-            int(area.height + DAMAGE_MARGIN * 2),
+            int(grown.x), int(grown.y), int(grown.width), int(grown.height)
         )
 
     def _on_draw(self, widget, cr):

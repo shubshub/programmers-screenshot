@@ -272,7 +272,7 @@ def main():
     check("and it has a flyout to open", tb.Toolbar.has_flyout(group))
 
     bar2.open_flyout(group)
-    entries = bar2.flyout[2]
+    entries = bar2.flyout.buttons
     check("the flyout lists the members",
           [b.tool.label for b in entries] == ["Black Bar", "Pixelate"],
           [b.tool.label for b in entries])

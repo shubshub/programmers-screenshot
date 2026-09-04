@@ -96,8 +96,7 @@ class TextBlock(Item):
             cr.show_text(line)
 
     def bounds(self):
-        box = self.box()
-        return Rect(box.x - 2, box.y - 2, box.width + 4, box.height + 4)
+        return self.box().grown(2)
 
     def is_empty(self):
         return not any(line.strip() for line in self.lines)

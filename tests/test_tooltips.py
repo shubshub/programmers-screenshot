@@ -50,7 +50,7 @@ def main():
         behind_a_group = button.members and h.bar.shown(button).name != name
         if behind_a_group:
             h.bar.open_flyout(button)
-            entry = next(b for b in h.bar.flyout[2] if b.tool.name == name)
+            entry = next(b for b in h.bar.flyout.buttons if b.tool.name == name)
             said = h.bar.tooltip_for(entry)
             h.bar.flyout = None
         else:
@@ -91,7 +91,7 @@ def main():
     # They moved off the settings row onto the line tool's own button, but a
     # picture of a shape still needs a name on hover.
     h.bar.open_flyout(h.button(toolbar.TOOL, "line"))
-    said = {h.bar.tooltip_for(b) for b in h.bar.flyout[2]}
+    said = {h.bar.tooltip_for(b) for b in h.bar.flyout.buttons}
     check("shape options are named",
           said == {"Line", "Rectangle", "Circle", "Arrow"},
           sorted(s or "-" for s in said))
