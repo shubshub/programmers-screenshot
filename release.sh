@@ -81,19 +81,11 @@ check_version packaging/changelog "($VERSION)"
 
 # --- 4. it does what it says ------------------------------------------------
 step "Tests"
-suites=$(ls tests/test_*.py | wc -l)
-failed=""
-for suite in tests/test_*.py; do
-    if output=$(timeout 900 python3 "$suite" 2>&1) && [ "$(echo "$output" | tail -1)" = "0 failure(s)" ]; then
-        :
-    else
-        failed="$failed $(basename "$suite")"
-    fi
-done
-if [ -z "$failed" ]; then
-    ok "$suites suites pass"
+if suite_output=$(python3 tests/run.py 2>&1); then
+    ok "$(echo "$suite_output" | tail -1)"
 else
-    bad "failing:$failed"
+    bad "$(echo "$suite_output" | tail -1)"
+    echo "$suite_output" | sed 's/^/        /'
 fi
 
 # --- 5. build ---------------------------------------------------------------
@@ -169,6 +161,17 @@ fi
 
 # --- 7. lint ----------------------------------------------------------------
 step "Lint"
+if command -v ruff >/dev/null; then
+    if ruff_output=$(ruff check src tests 2>&1); then
+        ok "ruff is happy"
+    else
+        bad "ruff says:"
+        echo "$ruff_output" | sed 's/^/        /'
+    fi
+else
+    note "ruff not installed — pipx run ruff check src tests lints without installing it"
+fi
+
 if command -v lintian >/dev/null; then
     if lintian_output=$(lintian --no-tag-display-limit "$DEB" 2>&1); then
         ok "lintian is happy"

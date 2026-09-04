@@ -13,28 +13,8 @@ import shutil
 import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, os.pardir, "src"))
-
-from programmers_screenshot import skill  # noqa: E402
-
-
-class Checker:
-    def __init__(self):
-        self.failures = []
-
-    def section(self, title):
-        print("\n%s" % title)
-
-    def __call__(self, name, condition, detail=""):
-        suffix = "  [%s]" % (detail,) if detail != "" and detail is not None else ""
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name, suffix))
-        if not condition:
-            self.failures.append(name)
-
-    def report(self):
-        print("\n%d failure(s)" % len(self.failures))
-        return 1 if self.failures else 0
+from checker import Checker
+from programmers_screenshot import skill
 
 
 def frontmatter(text):

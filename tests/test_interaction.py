@@ -7,7 +7,6 @@ directly. No display interaction is needed beyond opening one.
     python3 tests/test_interaction.py
 """
 
-import os
 import sys
 
 import gi
@@ -17,13 +16,7 @@ gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk, Gtk  # noqa: E402
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 from support import Checker, Harness  # noqa: E402
-
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
-)
 
 from programmers_screenshot import capture, toolbar  # noqa: E402
 

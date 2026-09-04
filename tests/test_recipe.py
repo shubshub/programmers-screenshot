@@ -8,7 +8,7 @@ wants a display, and it says so and skips itself when there is none.
     python3 tests/test_recipe.py
 """
 
-import json
+import contextlib
 import os
 import shutil
 import sys
@@ -23,13 +23,7 @@ gi.require_version("GdkPixbuf", "2.0")
 
 from gi.repository import Gdk, GdkPixbuf, Gtk  # noqa: E402
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 from support import Checker, pixel  # noqa: E402
-
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
-)
 
 from programmers_screenshot import (  # noqa: E402
     capture, cli, output, preferences, recipe, theme,
@@ -152,7 +146,7 @@ def main():
 
     check.section("nothing is drawn when any part of it is wrong")
     stand = Stand()
-    try:
+    with contextlib.suppress(recipe.RecipeError):
         recipe.annotate(
             recipe.parse(
                 '{"annotate": [{"box": [0,0,9,9]}, {"step": [1,1]}, {"arrow": []}]}'
@@ -160,8 +154,6 @@ def main():
             stand,
             recipe.Frame(stand.bounds),
         )
-    except recipe.RecipeError:
-        pass
     check("the scene is left empty", stand.scene.items == [], stand.scene.items)
 
     check.section("every mark the table offers can be drawn")

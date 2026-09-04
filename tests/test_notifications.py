@@ -20,26 +20,12 @@ from gi.repository import GdkPixbuf  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, os.pardir)
-sys.path.insert(0, os.path.join(ROOT, "src"))
 
+from checker import Checker  # noqa: E402
 from programmers_screenshot import notifications, paths  # noqa: E402
 from programmers_screenshot.cli import build_parser  # noqa: E402
 
 LAUNCHER = os.path.join(ROOT, "bin", "programmers-screenshot")
-
-
-class Checker:
-    def __init__(self):
-        self.failures = []
-
-    def section(self, title):
-        print("\n%s" % title)
-
-    def __call__(self, name, condition, detail=""):
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name,
-                           ("  [%s]" % detail) if detail else ""))
-        if not condition:
-            self.failures.append(name)
 
 
 def sample_png(directory):
@@ -109,8 +95,7 @@ def main():
     os.unlink(image)
     os.rmdir(workspace)
 
-    print("\n%d failure(s)" % len(check.failures))
-    return 1 if check.failures else 0
+    return check.report()
 
 
 if __name__ == "__main__":

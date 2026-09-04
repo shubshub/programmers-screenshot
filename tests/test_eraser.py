@@ -8,15 +8,9 @@ there, on screen and in the saved PNG both.
     python3 tests/test_eraser.py
 """
 
-import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, os.pardir)
-sys.path.insert(0, os.path.join(ROOT, "src"))
-sys.path.insert(0, HERE)
-
-import gi  # noqa: E402
+import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")

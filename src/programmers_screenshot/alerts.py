@@ -11,6 +11,7 @@ something has to be alive to hold the window. Nothing here ever runs before a
 capture is delivered.
 """
 
+import contextlib
 import json
 import subprocess
 
@@ -100,8 +101,6 @@ def run(payload):
     dialog.destroy()
 
     if answer == Gtk.ResponseType.ACCEPT:
-        try:
+        with contextlib.suppress(GLib.Error):
             Gio.AppInfo.launch_default_for_uri(notice["uri"], None)
-        except GLib.Error:
-            pass
     return 0

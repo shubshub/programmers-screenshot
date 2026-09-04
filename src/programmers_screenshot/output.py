@@ -1,5 +1,6 @@
 """What happens to a captured image: file, clipboard, notification."""
 
+import contextlib
 import os
 import shutil
 import subprocess
@@ -62,10 +63,8 @@ def save(pixbuf, directory=None, output=None):
 
 
 def _discard(path):
-    try:
+    with contextlib.suppress(OSError):
         os.unlink(path)
-    except OSError:
-        pass
 
 
 def copy_to_clipboard(pixbuf):

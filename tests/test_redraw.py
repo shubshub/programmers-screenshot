@@ -12,7 +12,6 @@ overlay asks to have redrawn, and then compare it against a full repaint.
     python3 tests/test_redraw.py
 """
 
-import os
 import sys
 
 import cairo
@@ -23,13 +22,7 @@ gi.require_version("Gdk", "3.0")
 
 from gi.repository import Gdk, Gtk  # noqa: E402
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 from support import Checker, Harness  # noqa: E402
-
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "src")
-)
 
 from programmers_screenshot import capture  # noqa: E402
 from programmers_screenshot.settings import COLOUR, WIDTH  # noqa: E402

@@ -15,26 +15,12 @@ import wave
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, os.pardir)
-sys.path.insert(0, os.path.join(ROOT, "src"))
 
+from checker import Checker  # noqa: E402
 from programmers_screenshot import paths, sound  # noqa: E402
 
 GENERATOR = os.path.join(ROOT, "tools", "make-shutter-sound.py")
 COMMITTED = os.path.join(ROOT, "packaging", "shutter.wav")
-
-
-class Checker:
-    def __init__(self):
-        self.failures = []
-
-    def section(self, title):
-        print("\n%s" % title)
-
-    def __call__(self, name, condition, detail=""):
-        print("%s %s%s" % ("  ok  " if condition else " FAIL ", name,
-                           ("  [%s]" % detail) if detail else ""))
-        if not condition:
-            self.failures.append(name)
 
 
 def main():
@@ -91,8 +77,7 @@ def main():
     check("off by default", build_parser().parse_args([]).no_sound is False)
     check("can be switched off", build_parser().parse_args(["--no-sound"]).no_sound)
 
-    print("\n%d failure(s)" % len(check.failures))
-    return 1 if check.failures else 0
+    return check.report()
 
 
 if __name__ == "__main__":

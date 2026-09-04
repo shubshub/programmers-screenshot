@@ -1,5 +1,6 @@
 """Getting pixels off the screen, on X11 and on Wayland."""
 
+import contextlib
 import os
 import tempfile
 
@@ -235,7 +236,5 @@ def _grab_from_gnome_shell():
 
 
 def _unlink(path):
-    try:
+    with contextlib.suppress(OSError):
         os.unlink(path)
-    except OSError:
-        pass

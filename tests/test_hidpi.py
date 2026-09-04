@@ -10,15 +10,9 @@ part that already worked keeps working.
     python3 tests/test_hidpi.py
 """
 
-import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(HERE, os.pardir)
-sys.path.insert(0, os.path.join(ROOT, "src"))
-sys.path.insert(0, HERE)
-
-import gi  # noqa: E402
+import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
