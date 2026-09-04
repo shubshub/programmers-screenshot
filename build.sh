@@ -5,11 +5,20 @@
 #   ./build.sh --install    -> build, then install it with apt
 set -euo pipefail
 
-VERSION="0.27.0"
 PACKAGE="programmers-screenshot"
 ARCH="all"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# One place the version is written: the program itself. Everything that needs
+# it reads it from there, so a bump cannot leave the package, the man page and
+# the program disagreeing about what this is.
+VERSION="$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' "$HERE/src/programmers_screenshot/cli.py")"
+if [ -z "$VERSION" ]; then
+    echo "no VERSION found in src/programmers_screenshot/cli.py" >&2
+    exit 1
+fi
+
 BUILD="$HERE/build/$PACKAGE"
 DIST="$HERE/dist"
 DEB="$DIST/${PACKAGE}_${VERSION}_${ARCH}.deb"
@@ -36,7 +45,8 @@ install -m 0644 "$HERE"/src/programmers_screenshot/tools/*.py "$TOOLS_DIR/"
 install -m 0644 "$HERE/packaging/shutter.wav"              "$SOUND_DIR/shutter.wav"
 install -m 0644 "$HERE/packaging/$PACKAGE.desktop"         "$BUILD/usr/share/applications/$PACKAGE.desktop"
 install -m 0644 "$HERE/packaging/$PACKAGE.svg"             "$BUILD/usr/share/icons/hicolor/scalable/apps/$PACKAGE.svg"
-gzip -9nc "$HERE/packaging/$PACKAGE.1" > "$BUILD/usr/share/man/man1/$PACKAGE.1.gz"
+sed "s/@VERSION@/$VERSION/" "$HERE/packaging/$PACKAGE.1" \
+    | gzip -9nc > "$BUILD/usr/share/man/man1/$PACKAGE.1.gz"
 chmod 0644 "$BUILD/usr/share/man/man1/$PACKAGE.1.gz"
 
 # --- control ---------------------------------------------------------------

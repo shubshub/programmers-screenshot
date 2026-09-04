@@ -341,7 +341,6 @@ def load_input(path):
     all -- so the browser takes its own picture of the tab it means, and this
     annotates that. Every other way round is a guess about which tab was in
     front.
-
     """
     try:
         pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)

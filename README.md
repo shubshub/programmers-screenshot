@@ -21,13 +21,15 @@ containing folder with the file selected.
 ./build.sh --install
 ```
 
-That produces `dist/programmers-screenshot_0.27.0_all.deb` and installs it with
-apt (which pulls in the dependencies). To build without installing, drop the
-flag and install by hand:
+That produces `dist/programmers-screenshot_<version>_all.deb` and installs it
+with apt (which pulls in the dependencies). The version is whatever the
+program says it is; the current number is on the
+[Releases page](https://github.com/shubshub/programmers-screenshot/releases).
+To build without installing, drop the flag and install by hand:
 
 ```bash
 ./build.sh
-sudo apt install ./dist/programmers-screenshot_0.27.0_all.deb
+sudo apt install ./dist/programmers-screenshot_<version>_all.deb
 ```
 
 ## Bind it to a key
