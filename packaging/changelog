@@ -1,3 +1,16 @@
+programmers-screenshot (0.27.2) noble; urgency=medium
+
+  * The screen can be captured on a Wayland desktop that is not GNOME. The
+    capture knew only X11's root window and org.gnome.Shell.Screenshot, which
+    is GNOME's own interface, so on KDE, sway, Hyprland or COSMIC every shot
+    failed with "no X11 root access, and org.gnome.Shell.Screenshot is
+    unavailable". It now falls back to xdg-desktop-portal, which those
+    desktops provide. GNOME is unchanged: its interface is still tried first,
+    and takes the picture without a permission prompt. The file the portal
+    leaves behind is removed, as the Shell's already was.
+
+ -- Shubshub  Thu, 10 Sep 2026 15:25:30 +1200
+
 programmers-screenshot (0.27.1) noble; urgency=medium
 
   * A clipboard helper that dies mid-copy no longer ends the run with a
