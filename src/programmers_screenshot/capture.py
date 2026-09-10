@@ -175,11 +175,14 @@ def capture_screen(display):
     bounds = screen_bounds(display)
     pixbuf = _grab_from_root(bounds) if is_x11(display) else None
     if pixbuf is None:
-        pixbuf = _grab_from_gnome_shell()
+        pixbuf = _grab_from_gnome_shell() or _grab_from_portal()
     if pixbuf is None:
         raise CaptureError(
-            "could not capture the screen: no X11 root access, and "
-            "org.gnome.Shell.Screenshot is unavailable"
+            "could not capture the screen: no X11 root access, "
+            "org.gnome.Shell.Screenshot is unavailable, and the desktop "
+            "portal refused or is not running (needs xdg-desktop-portal and "
+            "the backend for this desktop, e.g. xdg-desktop-portal-wlr on "
+            "sway or -kde on KDE)"
         )
     return pixbuf, bounds
 
@@ -235,3 +238,87 @@ def _grab_from_gnome_shell():
         if written_to and written_to != path:
             with contextlib.suppress(OSError):
                 os.unlink(written_to)
+
+
+PORTAL = "org.freedesktop.portal.Desktop"
+
+
+def _grab_from_portal():
+    """Every Wayland session that is not GNOME: the desktop portal.
+
+    org.gnome.Shell.Screenshot is GNOME's own interface and exists nowhere
+    else, so on KDE, sway, Hyprland or COSMIC the capture has to go through
+    xdg-desktop-portal instead. The portal answers asynchronously: the call
+    returns a Request object path and the picture arrives later as a signal
+    on it, so this waits on a main loop. The subscription goes on first, to
+    the path the spec says the token will produce, because a fast portal can
+    answer before the call returns.
+
+    Like the Shell, it leaves the raw screen in a file of its choosing, which
+    gets removed for the same reason: a copy on disk would outlive any
+    redaction drawn on the capture we keep.
+    """
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    except GLib.Error:
+        return None
+
+    token = "programmers_screenshot_%d" % os.getpid()
+    request_path = "/org/freedesktop/portal/desktop/request/%s/%s" % (
+        bus.get_unique_name()[1:].replace(".", "_"),
+        token,
+    )
+    loop = GLib.MainLoop()
+    answer = {}
+
+    def responded(_bus, _sender, _path, _interface, _signal, parameters):
+        code, results = parameters.unpack()
+        answer["uri"] = results.get("uri") if code == 0 else None
+        loop.quit()
+
+    def give_up():
+        loop.quit()
+        return True  # stays alive, so the removal below is always valid
+
+    subscription = bus.signal_subscribe(
+        PORTAL,
+        "org.freedesktop.portal.Request",
+        "Response",
+        request_path,
+        None,
+        Gio.DBusSignalFlags.NONE,
+        responded,
+    )
+    timeout = GLib.timeout_add_seconds(30, give_up)
+    try:
+        bus.call_sync(
+            PORTAL,
+            "/org/freedesktop/portal/desktop",
+            "org.freedesktop.portal.Screenshot",
+            "Screenshot",
+            GLib.Variant("(sa{sv})", ("", {
+                "handle_token": GLib.Variant("s", token),
+                "interactive": GLib.Variant("b", False),
+            })),
+            GLib.VariantType("(o)"),
+            Gio.DBusCallFlags.NONE,
+            10000,
+            None,
+        )
+        loop.run()
+    except GLib.Error:
+        return None
+    finally:
+        bus.signal_unsubscribe(subscription)
+        GLib.source_remove(timeout)
+
+    if not answer.get("uri"):
+        return None
+    path = GLib.filename_from_uri(answer["uri"])[0]
+    try:
+        return GdkPixbuf.Pixbuf.new_from_file(path)
+    except GLib.Error:
+        return None
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(path)

@@ -518,9 +518,9 @@ WORKING FROM A BROWSER
 REQUIREMENTS
   A live desktop session on this machine: it reads the actual screen. Over
   plain ssh, in a container or in CI there is no display and it exits 1.
-  Under Wayland the capture goes through GNOME's screenshot interface, and
-  --window does not work at all -- no program there may read another's
-  window. It needs X11, and libwnck (gir1.2-wnck-3.0).
+  Under Wayland the capture goes through GNOME's screenshot interface or the
+  desktop portal, and --window does not work at all -- no program there may
+  read another's window. It needs X11, and libwnck (gir1.2-wnck-3.0).
 
   --input still reads the screen not at all, but it draws through the same
   machinery as everything else and so still wants a display. It is quiet: no

@@ -258,9 +258,11 @@ the settings window.
 
 The screen is captured *before* the overlay appears and painted back as the
 background, so tooltips, menus and animations hold still while you select.
-Under X11 the capture reads the root window directly; under Wayland it goes
-through the `org.gnome.Shell.Screenshot` D-Bus interface, so a GNOME session is
-required there.
+Under X11 the capture reads the root window directly; under Wayland there is no
+root window, so it asks the compositor: `org.gnome.Shell.Screenshot` on GNOME,
+and `xdg-desktop-portal` everywhere else, which covers KDE, sway, Hyprland and
+COSMIC. The portal route needs the backend package for that desktop installed,
+and may ask permission the first time.
 
 The overlay spans the full virtual screen rather than a single monitor, so
 selections can cross monitor boundaries. Every monitor gets its own copy of the
@@ -304,7 +306,7 @@ per-invocation.
 bin/programmers-screenshot        launcher; works from the checkout or /usr/bin
 src/programmers_screenshot/
     cli.py                        argument parsing and the top-level flow
-    capture.py                    reading pixels (X11 root, or GNOME D-Bus)
+    capture.py                    reading pixels (X11 root, GNOME D-Bus, portal)
     overlay.py                    the modal window: events, drawing, grabs
     toolbar.py                    one bar per monitor; rows, hit testing, drawing
     scene.py                      region + annotations, and undo/redo

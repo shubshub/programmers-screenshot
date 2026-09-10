@@ -76,10 +76,60 @@ class FakeShell:
         return FakeReply((self.succeeded, self.written_to))
 
 
+class FakePortal:
+    """A stand-in for xdg-desktop-portal, which is what non-GNOME Wayland has.
+
+    The real portal answers asynchronously on a Request object, so the fake
+    does too: the response is dispatched from the main loop the capture
+    starts, not from the call that asks for the picture.
+    """
+
+    def __init__(self, code=0, explode=False):
+        self.code = code
+        self.explode = explode
+        self.written_to = None
+        self.subscribed_to = None
+        self.unsubscribed = None
+        self._callback = None
+
+    def get_unique_name(self):
+        return ":1.42"
+
+    def signal_subscribe(self, _name, _interface, _signal, path, *rest):
+        self.subscribed_to = path
+        self._callback = rest[2]
+        return 7
+
+    def signal_unsubscribe(self, subscription):
+        self.unsubscribed = subscription
+
+    def call_sync(self, *_args, **_kwargs):
+        if self.explode:
+            raise GLib.Error("no portal on this bus")
+        self.written_to = os.path.join(tempfile.gettempdir(), "portal-shot.png")
+        if self.code == 0:  # a refused request writes nothing
+            write_png(self.written_to)
+        GLib.idle_add(self._respond)
+        return None
+
+    def _respond(self):
+        results = {"uri": GLib.filename_to_uri(self.written_to, None)}
+        self._callback(
+            self,
+            ":1.1",
+            self.subscribed_to,
+            "org.freedesktop.portal.Request",
+            "Response",
+            FakeReply((self.code, results if self.code == 0 else {})),
+        )
+        return False
+
+
 class StubGio:
     """Just the handful of Gio names the capture path touches."""
 
     shell = None
+    bus = None
 
     class BusType:
         SESSION = 0
@@ -90,10 +140,17 @@ class StubGio:
     class DBusCallFlags:
         NONE = 0
 
+    class DBusSignalFlags:
+        NONE = 0
+
     class DBusProxy:
         @staticmethod
         def new_for_bus_sync(*_args, **_kwargs):
             return StubGio.shell
+
+    @staticmethod
+    def bus_get_sync(*_args, **_kwargs):
+        return StubGio.bus
 
 
 def grab_with(shell):
@@ -106,6 +163,18 @@ def grab_with(shell):
     finally:
         capture.Gio = real
         StubGio.shell = None
+
+
+def grab_through(portal):
+    """Run the portal capture against a fake portal."""
+    real = capture.Gio
+    StubGio.bus = portal
+    capture.Gio = StubGio
+    try:
+        return capture._grab_from_portal()
+    finally:
+        capture.Gio = real
+        StubGio.bus = None
 
 
 def main():
@@ -238,6 +307,36 @@ def main():
             pixbuf, raised = None, error
         check("no exception escapes", raised is None, raised)
         check("no image comes back", pixbuf is None)
+
+        # ------------------------------------------------------------------
+        check.section("the portal is the fallback where GNOME's interface is not")
+        # KDE, sway, Hyprland, COSMIC: org.gnome.Shell.Screenshot does not
+        # exist there at all, and without this the capture simply failed.
+
+        portal = FakePortal()
+        pixbuf = grab_through(portal)
+        check("it returns an image", pixbuf is not None)
+        check("it listened on the request path it asked for",
+              (portal.subscribed_to or "").endswith("/1_42/programmers_screenshot_%d"
+                                                    % os.getpid()),
+              portal.subscribed_to)
+        check("the file the portal wrote is gone",
+              not os.path.exists(portal.written_to), portal.written_to)
+        check("the subscription was dropped", portal.unsubscribed == 7,
+              portal.unsubscribed)
+
+        portal = FakePortal(code=1)  # the user said no
+        pixbuf = grab_through(portal)
+        check("refused: no image comes back", pixbuf is None)
+
+        portal = FakePortal(explode=True)  # no portal on the bus at all
+        try:
+            pixbuf = grab_through(portal)
+            raised = None
+        except Exception as error:  # noqa: BLE001 - reporting whatever escapes
+            pixbuf, raised = None, error
+        check("absent: no exception escapes", raised is None, raised)
+        check("absent: no image comes back", pixbuf is None)
 
         # ------------------------------------------------------------------
         check.section("no stray captures in the temp directory")
