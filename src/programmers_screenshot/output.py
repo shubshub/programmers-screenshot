@@ -40,14 +40,8 @@ def save(pixbuf, directory=None, output=None):
     One consequence worth knowing: if the destination is a symlink, this
     replaces the link rather than writing through it.
     """
-    if output:
-        path = os.path.abspath(os.path.expanduser(output))
-    else:
-        folder = os.path.abspath(os.path.expanduser(directory or default_directory()))
-        path = os.path.join(folder, datetime.now().strftime(FILENAME_FORMAT))
-
+    path = destination(directory, output, FILENAME_FORMAT)
     folder = os.path.dirname(path) or "."
-    os.makedirs(folder, exist_ok=True)
 
     # Alongside the destination, so the rename cannot cross a filesystem.
     handle, temporary = tempfile.mkstemp(dir=folder, prefix=".", suffix=".png")
@@ -60,6 +54,22 @@ def save(pixbuf, directory=None, output=None):
         with contextlib.suppress(OSError):
             os.unlink(temporary)
         raise
+    return path
+
+
+def destination(directory, output, filename):
+    """Where a capture lands, and the folder for it made ready.
+
+    A recording is named the same way a PNG is -- an explicit -o wins, and
+    otherwise a timestamp in the chosen folder -- so the rule lives here
+    rather than once per kind of file. `filename` is a strftime pattern.
+    """
+    if output:
+        path = os.path.abspath(os.path.expanduser(output))
+    else:
+        folder = os.path.abspath(os.path.expanduser(directory or default_directory()))
+        path = os.path.join(folder, datetime.now().strftime(filename))
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     return path
 
 

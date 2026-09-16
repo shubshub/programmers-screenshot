@@ -16,7 +16,7 @@ from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 from . import (  # noqa: I101
     alerts, capture, hotkey, notifications, output, paths, preferences, recipe,
-    skill, tools, updates,
+    recording, skill, tools, updates,
 )
 from .geometry import Rect
 from .overlay import Overlay
@@ -82,6 +82,14 @@ def build_parser():
         "corrects for a browser save cropped at a page zoom",
     )
     parser.add_argument(
+        "--record", action="store_true",
+        help="record a region to WebM; run again to stop",
+    )
+    parser.add_argument(
+        "--gif", action="store_true",
+        help="with --record, convert the recording to a GIF",
+    )
+    parser.add_argument(
         "--delay", metavar="SECONDS", type=float, default=0,
         help="wait this long before the screen is captured",
     )
@@ -121,6 +129,8 @@ def build_parser():
     parser.add_argument(
         "--notification-agent", metavar="FILE", help=argparse.SUPPRESS
     )
+    # Internal: the detached process that owns a recording while it runs.
+    parser.add_argument("--record-agent", metavar="JSON", help=argparse.SUPPRESS)
     # Internal: an alert window carrying one link button, as JSON.
     parser.add_argument("--alert", metavar="JSON", help=argparse.SUPPRESS)
     # Internal: the detached update check, run well after any capture.
@@ -158,6 +168,13 @@ def _utility_command(options):
         return EXIT_OK
     if options.notification_agent:
         return notifications.run_agent(options.notification_agent)
+    if options.record_agent:
+        return recording.run_agent(options.record_agent)
+    if options.record and recording.stop_running():
+        # The same key starts and stops one, so a --record while a recording
+        # is running means stop. Before the display is touched: there is no
+        # overlay to show and nothing to photograph.
+        return EXIT_OK
     if options.alert:
         return alerts.run(options.alert)
     if options.check_updates:
@@ -303,10 +320,37 @@ def main(argv=None):
         sys.stderr.write("%s\n" % error)
         return EXIT_CANCELLED
 
+    if options.record:
+        return _start_recording(pixbuf, bounds, options)
+
     # --input photographed nothing, so there is no shot to announce.
     quiet = bool(options.input)
 
     return _deliver(pixbuf, bounds, options, spec, quiet)
+
+
+def _start_recording(pixbuf, bounds, options):
+    """Mark out an area with the overlay, then hand it to ffmpeg.
+
+    The frozen screen is the same one a screenshot is marked out on, and it is
+    only a backdrop here: what comes back is the rectangle, and the recording
+    is of the live screen inside it. Only the region tool is offered, because
+    nothing drawn on a still frame could survive into a video.
+    """
+    refusal = recording.unavailable(Gdk.Display.get_default())
+    if refusal:
+        sys.stderr.write("%s\n" % refusal)
+        return EXIT_CANCELLED
+
+    region = Overlay(
+        pixbuf, bounds, [tools.RectangleTool()], region_only=True
+    ).run()
+    if region is None:
+        return EXIT_CANCELLED
+    return recording.start(
+        recording.area_of(region, bounds, capture.pixel_scale(pixbuf, bounds)),
+        with_preferences(options),
+    )
 
 
 def scripted(options):

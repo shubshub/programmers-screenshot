@@ -45,6 +45,34 @@ Buttons need a process alive to receive the click, but the command itself
 exits at once so shell pipelines do not block. The notification is therefore
 owned by a short-lived detached helper, which exits when the notification is
 dismissed, when a button is pressed, or after five minutes.
+.SH RECORDING
+.B \-\-record
+marks out an area the same way a screenshot does, then hands it to
+.BR ffmpeg (1),
+which does the encoding: this program never touches a frame of it. Without
+ffmpeg installed it exits 1 and says so.
+.PP
+Stopping is the same key again. The running recording is remembered in
+.IR ~/.config/programmers\-screenshot/state.json ,
+and a second
+.B \-\-record
+sends it
+.BR SIGINT ,
+which is how ffmpeg is asked to finalise a file rather than truncate it. The
+notification that sits there while it records carries a \fBStop\fR button
+that does exactly the same thing. A recording left running by a killed
+helper is noticed and ignored rather than signalled, since the pid may since
+have been handed to something else.
+.PP
+The file is
+.IR Recording_YYYY\-MM\-DD_HH\-MM\-SS.webm ,
+beside the screenshots and readable only by its owner, from the first frame:
+it holds a video of a screen. Annotations are not offered, because nothing
+drawn on a frozen frame could survive into a recording of the live screen.
+.PP
+X11 only. Under Wayland the one route is the desktop portal's screencast,
+which cannot begin without somebody choosing a screen in a dialog first, so a
+hotkey cannot start one; it refuses with a message instead of half working.
 .SH TOOLS
 .TP
 .B Region
@@ -265,6 +293,21 @@ captured: the named window with
 .BR \-\-window ,
 or the whole virtual screen without it. Off until enabled; see
 .BR RECIPES .
+.TP
+.B \-\-record
+Record a region of the screen to a WebM video instead of photographing it. The
+overlay comes up with the region tool only; \fBCapture\fR (or Enter) starts
+recording rather than taking a shot, and the command exits at once, printing
+the path it is filling. Running
+.B \-\-record
+again stops it, so one hotkey does both. See
+.BR RECORDING .
+.TP
+.B \-\-gif
+With
+.BR \-\-record ,
+convert the finished recording to an animated GIF and keep that instead. Larger
+and lossier than the WebM; most things that take a GIF take a WebM.
 .TP
 .BR \-\-delay " " \fISECONDS\fR
 Wait before the screen is read, so a menu or a hover state can be set up

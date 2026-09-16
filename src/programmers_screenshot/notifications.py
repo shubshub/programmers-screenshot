@@ -7,6 +7,7 @@ offers actions is handed to a detached copy of ourselves running in agent
 mode, which lives only as long as the notification does.
 """
 
+import contextlib
 import os
 
 import gi
@@ -23,6 +24,7 @@ ICON = "programmers-screenshot"
 
 OPEN_IMAGE = "open-image"
 OPEN_FOLDER = "open-folder"
+STOP = "stop-recording"
 
 # The agent should never outlive its usefulness, even if the notification is
 # left sitting in the message tray.
@@ -47,6 +49,25 @@ def show_simple(summary, body):
         Notify.Notification.new(summary, body, ICON).show()
     except (GLib.Error, RuntimeError):
         pass
+
+
+def recording_started(on_stop):
+    """The banner that sits there for as long as a recording runs.
+
+    Returned rather than shown and forgotten: the caller has to hold on to it
+    or the callback is collected with it, and the Stop button does nothing.
+    It stays up until the recording ends, so it cannot be left claiming to be
+    recording something that stopped minutes ago.
+    """
+    Notify.init(APP_NAME)
+    notification = Notify.Notification.new(
+        "Recording", "Stop it here, or press the same hotkey again", ICON
+    )
+    notification.set_timeout(Notify.EXPIRES_NEVER)
+    notification.add_action(STOP, "Stop", lambda *_: on_stop(), None)
+    with contextlib.suppress(GLib.Error):
+        notification.show()
+    return notification
 
 
 def describe(path):

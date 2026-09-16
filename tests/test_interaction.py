@@ -19,6 +19,7 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 from support import Checker, Harness  # noqa: E402
 
 from programmers_screenshot import capture, toolbar  # noqa: E402
+from programmers_screenshot.tools import RectangleTool  # noqa: E402
 
 
 def main():
@@ -185,6 +186,27 @@ def main():
         (h.result.get_width(), h.result.get_height()) == (321, 234),
         "%dx%d" % (h.result.get_width(), h.result.get_height()),
     )
+
+    check.section("a recording's overlay hands back the region, not a picture")
+    # --record wants the rectangle to point ffmpeg at. The frozen frame it is
+    # marked out on is only a backdrop: the recording is of the live screen,
+    # so a picture of that frame would be the wrong thing entirely.
+    h = Harness(pixbuf, bounds, tools=[RectangleTool()], region_only=True)
+    x, y = h.canvas_point()
+    h.drag(x, y, 260, 140)
+    h.click_button(toolbar.CAPTURE)
+    check("finished", h.finished)
+    check(
+        "it is the region that comes back",
+        h.result is not None and (h.result.width, h.result.height) == (260, 140),
+        h.result and "%gx%g" % (h.result.width, h.result.height),
+    )
+    check("and not an image of it", not hasattr(h.result, "get_pixels"))
+
+    check.section("cancelling a recording's overlay starts nothing")
+    h = Harness(pixbuf, bounds, tools=[RectangleTool()], region_only=True)
+    h.key("Escape")
+    check("nothing comes back", h.finished and h.result is None, h.result)
 
     return check.report()
 
