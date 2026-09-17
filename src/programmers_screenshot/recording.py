@@ -22,7 +22,7 @@ import signal
 import subprocess
 import tempfile
 
-import gi
+from gi.repository import Gio, GLib
 
 from . import notifications, output, state
 from .paths import spawn_detached
@@ -151,53 +151,222 @@ def start(area, options):
 # --------------------------------------------------------------------------
 
 
-def indicator(on_stop):
-    """A red dot in the status area, with Stop on it, or None.
+STATUS_ITEM = """
+<node>
+  <interface name="org.kde.StatusNotifierItem">
+    <property name="Category" type="s" access="read"/>
+    <property name="Id" type="s" access="read"/>
+    <property name="Title" type="s" access="read"/>
+    <property name="Status" type="s" access="read"/>
+    <property name="IconName" type="s" access="read"/>
+    <property name="ItemIsMenu" type="b" access="read"/>
+    <property name="Menu" type="o" access="read"/>
+    <method name="Activate">
+      <arg name="x" type="i" direction="in"/>
+      <arg name="y" type="i" direction="in"/>
+    </method>
+    <method name="SecondaryActivate">
+      <arg name="x" type="i" direction="in"/>
+      <arg name="y" type="i" direction="in"/>
+    </method>
+  </interface>
+  <interface name="com.canonical.dbusmenu">
+    <property name="Version" type="u" access="read"/>
+    <property name="Status" type="s" access="read"/>
+    <property name="TextDirection" type="s" access="read"/>
+    <property name="IconThemePath" type="as" access="read"/>
+    <method name="GetLayout">
+      <arg name="parentId" type="i" direction="in"/>
+      <arg name="recursionDepth" type="i" direction="in"/>
+      <arg name="propertyNames" type="as" direction="in"/>
+      <arg name="revision" type="u" direction="out"/>
+      <arg name="layout" type="(ia{sv}av)" direction="out"/>
+    </method>
+    <method name="GetGroupProperties">
+      <arg name="ids" type="ai" direction="in"/>
+      <arg name="propertyNames" type="as" direction="in"/>
+      <arg name="properties" type="a(ia{sv})" direction="out"/>
+    </method>
+    <method name="GetProperty">
+      <arg name="id" type="i" direction="in"/>
+      <arg name="name" type="s" direction="in"/>
+      <arg name="value" type="v" direction="out"/>
+    </method>
+    <method name="Event">
+      <arg name="id" type="i" direction="in"/>
+      <arg name="eventId" type="s" direction="in"/>
+      <arg name="data" type="v" direction="in"/>
+      <arg name="timestamp" type="u" direction="in"/>
+    </method>
+    <method name="AboutToShow">
+      <arg name="id" type="i" direction="in"/>
+      <arg name="needUpdate" type="b" direction="out"/>
+    </method>
+  </interface>
+</node>
+"""
 
-    Where somebody looks for a thing that is currently happening: the top bar,
-    beside the volume and the battery. The notification is not enough on its
-    own -- GNOME collapses one that carries buttons, so its Stop can be behind
-    an expander arrow in a tray nobody has open, which is a poor way to reach
-    the only control a running recording has.
+ITEM_PATH = "/StatusNotifierItem"
+MENU_PATH = "/StatusNotifierItem/Menu"
+WATCHER = "org.kde.StatusNotifierWatcher"
+STOP_ID = 1
+STOP_LABEL = "Stop recording"
 
-    None when the typelib is not installed. It is a Recommends rather than a
-    dependency: without it the notification's Stop button and running the
-    command again both still work, and neither is worth refusing to record
-    over. The desktop also needs something listening on the bus for these --
-    GNOME needs the AppIndicator extension, which Ubuntu ships switched on.
+
+class Indicator:
+    """A red dot in the status area, with Stop on it, spoken over D-Bus.
+
+    StatusNotifierItem is an interface, not a library. The AppIndicator
+    typelib is a convenience wrapper round it and one more package to have
+    installed -- and a Recommends that somebody skips would mean the only
+    control a running recording has quietly does not appear. Gio is already
+    a hard dependency, so this talks to the desktop itself.
+
+    The menu is here because of how a click is read: GNOME's AppIndicator
+    extension opens the item's menu on a single click and only calls Activate
+    on a double one, so an item with no menu looks broken to anybody who
+    clicks it once. There is one item on it and it never changes, which is
+    why the layout is a constant and the revision never moves. Activate and
+    the middle click do the same thing, for a desktop that reads them.
+
+    Nothing here is worth failing a recording over: if the bus is not there,
+    or nothing is listening for these, the recording still runs and the
+    notification's Stop button and the command itself still end it.
     """
-    try:
-        gi.require_version("AyatanaAppIndicator3", "0.1")
-        from gi.repository import AyatanaAppIndicator3 as applet
-    except (ImportError, ValueError):
-        return None
-    from gi.repository import Gtk
 
-    Gtk.init_check()  # the menu is a real GtkMenu, exported over the bus
-    item = Gtk.MenuItem(label="Stop recording")
-    item.connect("activate", lambda *_: on_stop())
-    menu = Gtk.Menu()
-    menu.append(item)
-    menu.show_all()
+    def __init__(self, on_stop):
+        self.on_stop = on_stop
+        self.bus = None
+        self.registrations = ()
+        nodes = Gio.DBusNodeInfo.new_for_xml(STATUS_ITEM)
+        self.interfaces = {
+            info.name: info for info in nodes.interfaces
+        }
+        self.properties = {
+            "org.kde.StatusNotifierItem": {
+                "Category": GLib.Variant("s", "ApplicationStatus"),
+                "Id": GLib.Variant("s", "programmers-screenshot"),
+                "Title": GLib.Variant("s", "Recording"),
+                "Status": GLib.Variant("s", "Active"),
+                "IconName": GLib.Variant("s", ICON),
+                "ItemIsMenu": GLib.Variant("b", False),
+                "Menu": GLib.Variant("o", MENU_PATH),
+            },
+            "com.canonical.dbusmenu": {
+                "Version": GLib.Variant("u", 3),
+                "Status": GLib.Variant("s", "normal"),
+                "TextDirection": GLib.Variant("s", "ltr"),
+                "IconThemePath": GLib.Variant("as", []),
+            },
+        }
 
-    dot = applet.Indicator.new(
-        "programmers-screenshot", ICON, applet.IndicatorCategory.APPLICATION_STATUS
-    )
-    dot.set_status(applet.IndicatorStatus.ACTIVE)
-    dot.set_title("Recording")
-    dot.set_menu(menu)
-    # The menu is held by the indicator, but the item's callback is not: hang
-    # both off it so a garbage collection cannot quietly disconnect Stop.
-    dot.kept = (menu, item)
-    #: How to take it off the bar again, without importing the module twice.
-    dot.passive = applet.IndicatorStatus.PASSIVE
-    return dot
+    def show(self):
+        """Offer it to the desktop. False if there is no bus to offer it to.
+
+        The last step is deliberately asynchronous. A watcher reads the item's
+        properties back before it answers the registration, and a blocking
+        call could not serve them: the reply would be waiting on this thread,
+        and so would every incoming question about the item. It deadlocks
+        until the timeout, and nothing appears. Sent this way it is answered
+        out of the main loop the recording is already running under.
+        """
+        name = "org.kde.StatusNotifierItem-%d-1" % os.getpid()
+        try:
+            self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            self.bus.call_sync(
+                "org.freedesktop.DBus", "/org/freedesktop/DBus",
+                "org.freedesktop.DBus", "RequestName",
+                GLib.Variant("(su)", (name, 4)),  # 4: do not queue behind another
+                None, Gio.DBusCallFlags.NONE, 2000, None,
+            )
+            self.registrations = (
+                self.bus.register_object(
+                    ITEM_PATH, self.interfaces["org.kde.StatusNotifierItem"],
+                    self._called, self._property, None),
+                self.bus.register_object(
+                    MENU_PATH, self.interfaces["com.canonical.dbusmenu"],
+                    self._called, self._property, None),
+            )
+        except GLib.Error:
+            self.close()
+            return False
+
+        self.bus.call(
+            WATCHER, "/StatusNotifierWatcher", WATCHER,
+            "RegisterStatusNotifierItem", GLib.Variant("(s)", (name,)),
+            None, Gio.DBusCallFlags.NONE, 5000, None, self._registered,
+        )
+        return True
+
+    def _registered(self, bus, result):
+        """Nothing took it -- no watcher, or it said no. Take the object back."""
+        try:
+            bus.call_finish(result)
+        except GLib.Error:
+            self.close()
+
+    def close(self):
+        for registration in self.registrations:
+            with contextlib.suppress(GLib.Error):
+                self.bus.unregister_object(registration)
+        self.registrations = ()
+
+    # -- what the desktop asks of it ---------------------------------------
+
+    def _property(self, _bus, _sender, _path, interface, name):
+        return self.properties.get(interface, {}).get(name)
+
+    def _called(self, _bus, _sender, _path, _interface, method, parameters,
+                invocation):
+        if method in ("Activate", "SecondaryActivate"):
+            self.on_stop()
+            invocation.return_value(None)
+        elif method == "GetLayout":
+            invocation.return_value(GLib.Variant(
+                "(u(ia{sv}av))",
+                (1, (0, {"children-display": GLib.Variant("s", "submenu")},
+                     [GLib.Variant.new_variant(self._item())])),
+            ))
+        elif method == "GetGroupProperties":
+            invocation.return_value(GLib.Variant(
+                "(a(ia{sv}))", ([(STOP_ID, self._item_properties())],)
+            ))
+        elif method == "GetProperty":
+            _id, name = parameters.unpack()
+            invocation.return_value(GLib.Variant(
+                "(v)", (self._item_properties().get(name, GLib.Variant("b", False)),)
+            ))
+        elif method == "Event":
+            identifier, event = parameters.unpack()[:2]
+            if event == "clicked" and identifier == STOP_ID:
+                self.on_stop()
+            invocation.return_value(None)
+        elif method == "AboutToShow":
+            # One item that never changes: there is nothing to rebuild first.
+            invocation.return_value(GLib.Variant("(b)", (False,)))
+        else:
+            invocation.return_value(None)
+
+    def _item(self):
+        return GLib.Variant("(ia{sv}av)", (STOP_ID, self._item_properties(), []))
+
+    @staticmethod
+    def _item_properties():
+        return {
+            "label": GLib.Variant("s", STOP_LABEL),
+            "enabled": GLib.Variant("b", True),
+            "visible": GLib.Variant("b", True),
+        }
+
+
+def indicator(on_stop):
+    """The dot, once the desktop has taken it, or None if it would not."""
+    dot = Indicator(on_stop)
+    return dot if dot.show() else None
 
 
 def run_agent(payload):
     """Record until somebody stops it, then finish the file and announce it."""
-    from gi.repository import GLib  # agent mode only; starting one needs no loop
-
     spec = json.loads(payload)
     path = spec["path"]
     # With --gif the deliverable is a conversion of the recording, so ffmpeg
@@ -232,7 +401,7 @@ def run_agent(payload):
     loop.run()
     _close(notification)
     if dot is not None:
-        dot.set_status(dot.passive)
+        dot.close()
 
     state.remember(recording=None)
     return _finish(recorded, path, errors)

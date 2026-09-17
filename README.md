@@ -271,11 +271,18 @@ immediately, printing the path it is filling, so binding one key to
 While it runs there is a red dot in the desktop's status area — the top bar,
 beside the volume and the battery — and **Stop recording** on it ends the
 recording. That is where you look for something that is currently happening.
-It needs `gir1.2-ayatanaappindicator3-0.1`, and a desktop listening for these:
-GNOME needs the AppIndicator extension, which Ubuntu ships switched on. Without
-either, the notification that sits there while it records has its own Stop
-button — though GNOME collapses notifications that carry buttons, so it can be
-behind the expander arrow.
+
+No extra package for it: `StatusNotifierItem` is a D-Bus interface rather than
+a library, and the app-indicator bindings are only a wrapper round it, so the
+dot is spoken to the desktop through Gio, which is already needed. The desktop
+does have to be listening — on GNOME that is the AppIndicator extension, which
+Ubuntu ships switched on. Where nothing is, the notification that sits there
+while it records has its own Stop button, though GNOME collapses notifications
+that carry buttons so it can be behind the expander arrow.
+
+The menu exists because of how a click is read: GNOME's extension opens the
+item's menu on a single click and only calls `Activate` on a double one, so an
+item with no menu looks broken to anyone who clicks it once.
 
 There is also a red **record dot** on the toolbar — on the bar and on the
 floating palette both, since they are the same controls in two shapes — so an

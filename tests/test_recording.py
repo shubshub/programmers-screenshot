@@ -19,6 +19,8 @@ import types
 
 from checker import Checker  # noqa: E402
 
+from gi.repository import GLib  # noqa: E402
+
 from programmers_screenshot import cli, recording, state  # noqa: E402
 
 CONFIG = tempfile.mkdtemp(prefix="programmers-screenshot-recording-")
@@ -39,6 +41,24 @@ def rect(x, y, width, height):
 def flag(argv, name):
     """The value of one flag, as the real parser sees it."""
     return getattr(cli.build_parser().parse_args(argv), name)
+
+
+class FakeInvocation:
+    """Stands in for the D-Bus call the desktop is waiting on an answer to."""
+
+    def __init__(self):
+        self.answered = None
+
+    def return_value(self, value):
+        self.answered = value
+
+
+def ask(dot, method, parameters=None):
+    """Put a method call to the indicator the way the bus would, and read
+    back what it answered."""
+    invocation = FakeInvocation()
+    dot._called(None, None, None, None, method, parameters, invocation)
+    return invocation.answered
 
 
 class FakeDisplay:
@@ -204,6 +224,51 @@ def main():
         check("having stopped the recording", process.poll() is not None)
     finally:
         recording.PROGRAM = real_program
+
+    # ----------------------------------------------------------------------
+    check.section("the dot in the status area, and what it answers")
+    # The one control a running recording has. It is answered straight off
+    # the bus rather than through a library: the desktop asks these exact
+    # questions, so they are what is checked, no session bus required.
+
+    stopped = []
+    dot = recording.Indicator(lambda: stopped.append("stop"))
+
+    check("it names an icon the theme has",
+          dot._property(None, None, None, "org.kde.StatusNotifierItem",
+                        "IconName").unpack() == "media-record")
+    check("it says what it is, for a desktop that shows the title",
+          dot._property(None, None, None, "org.kde.StatusNotifierItem",
+                        "Title").unpack() == "Recording")
+    check("it points at its own menu",
+          dot._property(None, None, None, "org.kde.StatusNotifierItem",
+                        "Menu").unpack() == recording.MENU_PATH)
+    check("an interface it does not serve has nothing to say",
+          dot._property(None, None, None, "org.example.Nonsense", "Id") is None)
+
+    revision, layout = ask(dot, "GetLayout").unpack()
+    entries = [(child[1].get("label"), child[1].get("enabled"))
+               for child in layout[2]]
+    check("the menu offers exactly one thing: stopping",
+          entries == [("Stop recording", True)], entries)
+    check("and it has a revision, which never moves", revision == 1, revision)
+
+    check("nothing has been stopped yet", stopped == [], stopped)
+    ask(dot, "Event", GLib.Variant("(isvu)", (recording.STOP_ID, "hovered",
+                                              GLib.Variant("i", 0), 0)))
+    check("hovering over it does nothing", stopped == [], stopped)
+
+    ask(dot, "Event", GLib.Variant("(isvu)", (recording.STOP_ID, "clicked",
+                                              GLib.Variant("i", 0), 0)))
+    check("clicking it stops the recording", stopped == ["stop"], stopped)
+
+    # A desktop that reads a click as Activate rather than opening the menu --
+    # a middle click on GNOME, a single click elsewhere -- gets the same thing.
+    ask(dot, "Activate", GLib.Variant("(ii)", (0, 0)))
+    check("so does activating it directly", stopped == ["stop", "stop"], stopped)
+
+    check("there is nothing to rebuild before it opens",
+          ask(dot, "AboutToShow", GLib.Variant("(i)", (0,))).unpack() == (False,))
 
     # ----------------------------------------------------------------------
     check.section("the flags are on the parser")
