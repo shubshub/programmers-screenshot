@@ -24,7 +24,7 @@ from .overlay import Overlay
 from .render import Renderer
 
 APP_ID = "com.github.shubshub.programmers-screenshot"
-VERSION = "0.27.2"
+VERSION = "0.28.0"
 
 EXIT_OK = 0
 EXIT_CANCELLED = 1

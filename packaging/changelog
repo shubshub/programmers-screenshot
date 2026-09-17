@@ -1,3 +1,29 @@
+programmers-screenshot (0.28.0) noble; urgency=medium
+
+  * --record takes a WebM of a region instead of a picture of it. The
+    overlay comes up with the region tool only, Capture (or Enter) starts
+    it, and the command exits at once printing the path it is filling, so
+    binding one key to --record gives start and stop on that key: running
+    it again stops the recording. ffmpeg does the encoding and joins
+    Recommends; without it, one clear error naming the package.
+  * A red record dot sits beside Capture on the toolbar and on the floating
+    palette, so an ordinary screenshot run can become a recording without
+    starting again. It is only offered where recording would work.
+  * While a recording runs there is a dot in the desktop's status area
+    carrying Stop recording -- the top bar, beside the volume and the
+    battery, rather than a button behind a notification's expander arrow.
+    It needs no extra package: StatusNotifierItem is a D-Bus interface, and
+    it is served over Gio. The desktop has to be listening for one, which
+    on GNOME means the AppIndicator extension Ubuntu ships switched on.
+  * The recording is readable only by its owner from the first frame, and
+    stopping sends SIGINT so ffmpeg finalises the file rather than leaving
+    it truncated. --gif converts the result and keeps that instead.
+  * Recording is X11 only. Under Wayland the one route is the portal's
+    screencast, which cannot begin without somebody choosing a screen in a
+    dialog, so a hotkey cannot start one; it refuses with a message.
+
+ -- Shubshub  Thu, 17 Sep 2026 13:38:08 +1200
+
 programmers-screenshot (0.27.2) noble; urgency=medium
 
   * The screen can be captured on a Wayland desktop that is not GNOME. The
