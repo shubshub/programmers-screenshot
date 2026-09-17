@@ -269,6 +269,14 @@ immediately, printing the path it is filling, so binding one key to
 `--record` gives you start and stop on that key. The notification that sits
 there while it records has a Stop button that does the same thing.
 
+There is also a red **record dot** on the toolbar — on the bar and on the
+floating palette both, since they are the same controls in two shapes — so an
+ordinary screenshot run can turn into a recording without starting again: mark
+out an area and press the dot instead of Capture. It only appears where
+recording could actually work; a button that cannot do anything is worse than
+no button. Anything drawn stays behind, because a recording is of the live
+screen and the marks were made on a frozen frame of it.
+
 `ffmpeg` does the encoding — this program never touches a frame of it — so
 recording needs it installed, and says so plainly if it is not. The result is
 `Recording_2026-09-17_11-04-02.webm` beside the screenshots, VP9, readable

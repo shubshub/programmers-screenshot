@@ -51,7 +51,7 @@ class Overlay:
     nothing that gets drawn on a screenshot can be baked into a video.
     """
 
-    def __init__(self, pixbuf, bounds, tools, region_only=False):
+    def __init__(self, pixbuf, bounds, tools, region_only=False, record=False):
         # Everything about turning marks into a picture lives in the renderer;
         # this class is the window, the pointer and the toolbars around it.
         self.renderer = Renderer(pixbuf, bounds)
@@ -64,6 +64,11 @@ class Overlay:
         self.active_tool = tools[0]
         self.region_only = region_only
         self.hint = RECORD_HINT if region_only else HINT
+        #: Whether a Record button is offered at all: whoever built this
+        #: overlay has already worked out whether this machine can record.
+        self.record = record
+        #: Set when the result is an area to record rather than a picture.
+        self.recording = False
         self.values = SettingValues()
 
         self.result = None
@@ -84,6 +89,7 @@ class Overlay:
             tools, self.monitors, self.values,
             stored.get("toolbar", preferences.BAR),
             tuple(origin) if origin else None,
+            record=record,
         )
         self._moving_palette = None   # pointer offset while dragging it
 
@@ -209,7 +215,24 @@ class Overlay:
         # the scene and nothing else, so uncommitted work would be missing
         # from the image.
         self.scene.do(self.active_tool.commit())
-        self._finish(self.capture_region() if self.region_only else self.render())
+        if self.region_only:
+            # The whole session was started to record something, so Capture
+            # is the button that starts it.
+            self._record_now()
+            return
+        self._finish(self.render())
+
+    def _record_now(self):
+        """Finish with the area to record rather than a picture of it.
+
+        Whatever has been drawn stays behind. A recording is of the live
+        screen, and the marks were made on a frozen frame of it -- they would
+        be a still picture pasted over moving video, describing a moment that
+        has already gone.
+        """
+        self.scene.do(self.active_tool.commit())
+        self.recording = True
+        self._finish(self.capture_region())
 
     def render(self):
         """Bake the frozen screen plus every annotation into a pixbuf."""
@@ -243,6 +266,8 @@ class Overlay:
             self._choose_tool(self.toolbars.shown(button))
         elif button.kind == toolbar_module.CAPTURE:
             self._capture_now()
+        elif button.kind == toolbar_module.RECORD:
+            self._record_now()
         elif button.kind == toolbar_module.CANCEL:
             self._finish(None)
         elif button.kind == toolbar_module.SETTINGS:
@@ -305,6 +330,7 @@ class Overlay:
         self.toolbars = toolbar_module.Toolbars(
             self.tools, self.monitors, self.values, wanted,
             tuple(origin) if origin else None, self.toolbars.chosen,
+            record=self.record,
         )
         self.toolbars.show_settings_for(self.active_tool)
 

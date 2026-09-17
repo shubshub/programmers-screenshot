@@ -1,6 +1,7 @@
 """Command line entry point."""
 
 import argparse
+import collections
 import copy
 import os
 import sys
@@ -28,6 +29,10 @@ VERSION = "0.27.2"
 EXIT_OK = 0
 EXIT_CANCELLED = 1
 EXIT_BAD_USAGE = 2
+
+#: What the overlay came back with. Exactly one is set: a picture to deliver,
+#: or an area to record. Cancelling gives None instead of either.
+Outcome = collections.namedtuple("Outcome", "image area")
 
 
 def build_parser():
@@ -272,14 +277,18 @@ def _deliver(pixbuf, bounds, options, spec, quiet):
             return EXIT_BAD_USAGE
         output.deliver(captured, with_preferences(options), quiet)
     else:
-        captured = run_overlay(pixbuf, bounds)
-        if captured is None:
+        outcome = run_overlay(pixbuf, bounds)
+        if outcome is None:
             return EXIT_CANCELLED
+        if outcome.area is not None:
+            # The Record button, rather than Capture: nothing is delivered
+            # here, and what happens next is a recording of the live screen.
+            return _begin_recording(outcome.area, pixbuf, bounds, options)
         # After the overlay, not before: the settings window writes the file
         # while the overlay is up, and the capture in hand has to honour what
         # it says. Reading at startup meant a change only took effect from the
         # next run.
-        output.deliver(captured, with_preferences(options))
+        output.deliver(outcome.image, with_preferences(options))
     after_capture(options)
     return EXIT_OK
 
@@ -342,13 +351,21 @@ def _start_recording(pixbuf, bounds, options):
         sys.stderr.write("%s\n" % refusal)
         return EXIT_CANCELLED
 
-    region = Overlay(
-        pixbuf, bounds, [tools.RectangleTool()], region_only=True
-    ).run()
-    if region is None:
+    outcome = run_overlay(pixbuf, bounds, region_only=True)
+    if outcome is None:
         return EXIT_CANCELLED
+    return _begin_recording(outcome.area, pixbuf, bounds, options)
+
+
+def _begin_recording(area, pixbuf, bounds, options):
+    """Hand an area marked out on the overlay to the recorder.
+
+    The overlay works in logical pixels from the corner of the frozen screen;
+    what ffmpeg wants is physical pixels from the corner of the root window,
+    and the capture already knows the factor between them.
+    """
     return recording.start(
-        recording.area_of(region, bounds, capture.pixel_scale(pixbuf, bounds)),
+        recording.area_of(area, bounds, capture.pixel_scale(pixbuf, bounds)),
         with_preferences(options),
     )
 
@@ -471,13 +488,29 @@ def with_preferences(options):
     return effective
 
 
-def run_overlay(pixbuf, bounds):
-    """Run the overlay and return the captured pixbuf, or None if cancelled.
+def run_overlay(pixbuf, bounds, region_only=False):
+    """Run the overlay and return an Outcome, or None if it was cancelled.
 
-    The overlay renders it rather than returning a rectangle to crop, because
-    only it knows about the annotations that have to be baked in.
+    The overlay renders a capture itself rather than returning a rectangle to
+    crop, because only it knows about the annotations that have to be baked
+    in. A recording is the other way round: what comes back is the area, since
+    there is nothing to bake into a video of the live screen.
+
+    The Record button is only offered when this machine could actually record.
+    A button that cannot work is worse than no button, and --record has
+    already said so plainly by the time it gets here.
     """
-    return Overlay(pixbuf, bounds, tools.build_tools()).run()
+    can_record = recording.unavailable(Gdk.Display.get_default()) is None
+    overlay = Overlay(
+        pixbuf, bounds,
+        [tools.RectangleTool()] if region_only else tools.build_tools(),
+        region_only=region_only,
+        record=can_record and not region_only,
+    )
+    result = overlay.run()
+    if result is None:
+        return None
+    return Outcome(None, result) if overlay.recording else Outcome(result, None)
 
 
 def cairo_is_usable():

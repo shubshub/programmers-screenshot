@@ -28,9 +28,9 @@ from programmers_screenshot.tools import build_tools  # noqa: E402
 MONITOR = Rect(0, 0, 1920, 1080)
 
 
-def bars(mode, origin=None, monitors=None):
+def bars(mode, origin=None, monitors=None, record=False):
     return tb.Toolbars(build_tools(), monitors or [MONITOR], SettingValues(),
-                       mode, origin)
+                       mode, origin, record=record)
 
 
 def centre(rect):
@@ -72,6 +72,45 @@ def main():
               any(b.kind == kind for b in palette.buttons))
     check("the tools are a grid, not a row",
           len({b.rect.y for b in palette.buttons if b.kind == tb.TOOL}) > 1)
+
+    # ------------------------------------------------------------------
+    check.section("the record button, where recording is possible")
+    check("it is not there by default",
+          not any(b.kind == tb.RECORD for b in palette.buttons))
+
+    recordable = bars(tb.PALETTE, monitors=[MONITOR, second]).palette
+    wide_capture = next(b for b in recordable.buttons if b.kind == tb.CAPTURE)
+    recordable = bars(tb.PALETTE, monitors=[MONITOR, second], record=True).palette
+    dot = [b for b in recordable.buttons if b.kind == tb.RECORD]
+    check("one record button when this machine can record", len(dot) == 1, len(dot))
+    bottom_row = [b for b in recordable.buttons if b.kind != tb.TOOL]
+    check("it sits on the bottom row with the rest",
+          len({b.rect.y for b in bottom_row}) == 1,
+          sorted({b.rect.y for b in bottom_row}))
+    check("the palette did not have to grow for it",
+          recordable.rect.width == palette.rect.width,
+          (recordable.rect.width, palette.rect.width))
+
+    narrow_capture = next(b for b in recordable.buttons if b.kind == tb.CAPTURE)
+    check("Capture gave up the width instead",
+          narrow_capture.rect.width < wide_capture.rect.width,
+          (narrow_capture.rect.width, wide_capture.rect.width))
+    check("and still starts at the left edge",
+          narrow_capture.rect.x == wide_capture.rect.x)
+
+    # Overlapping buttons would mean one of them could never be clicked.
+    ordered = sorted(bottom_row, key=lambda b: b.rect.x)
+    check("nothing on the row overlaps anything else",
+          all(left.rect.right <= right.rect.x
+              for left, right in zip(ordered, ordered[1:])),
+          [(b.kind, b.rect.x, b.rect.right) for b in ordered])
+    check("and the row stays inside the palette",
+          ordered[-1].rect.right <= recordable.rect.right,
+          (ordered[-1].rect.right, recordable.rect.right))
+
+    on_the_bar = bars(tb.BAR, record=True).bars[0]
+    check("the bar offers it too, so the two are the same controls",
+          any(b.kind == tb.RECORD for b in on_the_bar.buttons))
 
     check.section("it has a handle, and only the handle picks it up")
     check("the strip is a grab", floating.grab_at(*centre(palette.grab_rect)))
