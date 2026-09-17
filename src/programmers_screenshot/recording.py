@@ -17,10 +17,12 @@ way leaves a playable recording rather than a truncated one.
 import contextlib
 import json
 import os
-import signal
 import shutil
+import signal
 import subprocess
 import tempfile
+
+import gi
 
 from . import notifications, output, state
 from .paths import spawn_detached
@@ -44,6 +46,8 @@ NO_WAYLAND = (
 GIF_FILTER = "[0:v] split [a][b];[a] palettegen [p];[b][p] paletteuse"
 
 POLL_MS = 1000
+
+ICON = "media-record"  # the red dot, from the desktop's own icon theme
 
 
 def unavailable(display):
@@ -147,6 +151,49 @@ def start(area, options):
 # --------------------------------------------------------------------------
 
 
+def indicator(on_stop):
+    """A red dot in the status area, with Stop on it, or None.
+
+    Where somebody looks for a thing that is currently happening: the top bar,
+    beside the volume and the battery. The notification is not enough on its
+    own -- GNOME collapses one that carries buttons, so its Stop can be behind
+    an expander arrow in a tray nobody has open, which is a poor way to reach
+    the only control a running recording has.
+
+    None when the typelib is not installed. It is a Recommends rather than a
+    dependency: without it the notification's Stop button and running the
+    command again both still work, and neither is worth refusing to record
+    over. The desktop also needs something listening on the bus for these --
+    GNOME needs the AppIndicator extension, which Ubuntu ships switched on.
+    """
+    try:
+        gi.require_version("AyatanaAppIndicator3", "0.1")
+        from gi.repository import AyatanaAppIndicator3 as applet
+    except (ImportError, ValueError):
+        return None
+    from gi.repository import Gtk
+
+    Gtk.init_check()  # the menu is a real GtkMenu, exported over the bus
+    item = Gtk.MenuItem(label="Stop recording")
+    item.connect("activate", lambda *_: on_stop())
+    menu = Gtk.Menu()
+    menu.append(item)
+    menu.show_all()
+
+    dot = applet.Indicator.new(
+        "programmers-screenshot", ICON, applet.IndicatorCategory.APPLICATION_STATUS
+    )
+    dot.set_status(applet.IndicatorStatus.ACTIVE)
+    dot.set_title("Recording")
+    dot.set_menu(menu)
+    # The menu is held by the indicator, but the item's callback is not: hang
+    # both off it so a garbage collection cannot quietly disconnect Stop.
+    dot.kept = (menu, item)
+    #: How to take it off the bar again, without importing the module twice.
+    dot.passive = applet.IndicatorStatus.PASSIVE
+    return dot
+
+
 def run_agent(payload):
     """Record until somebody stops it, then finish the file and announce it."""
     from gi.repository import GLib  # agent mode only; starting one needs no loop
@@ -181,8 +228,11 @@ def run_agent(payload):
     # something anybody can see.
     GLib.timeout_add(POLL_MS, lambda: loop.quit() if process.poll() is not None else True)
     notification = notifications.recording_started(stop_running)
+    dot = indicator(stop_running)
     loop.run()
     _close(notification)
+    if dot is not None:
+        dot.set_status(dot.passive)
 
     state.remember(recording=None)
     return _finish(recorded, path, errors)

@@ -13,6 +13,7 @@ Depends: python3 (>= 3.8),
          xclip | wl-clipboard
 Recommends: gir1.2-wnck-3.0,
             ffmpeg,
+            gir1.2-ayatanaappindicator3-0.1,
             nautilus | dolphin | nemo | thunar,
             gnome-session-canberra | pulseaudio-utils | pipewire-bin | alsa-utils
 Maintainer: Shubshub

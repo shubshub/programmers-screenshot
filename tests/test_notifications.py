@@ -22,7 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, os.pardir)
 
 from checker import Checker  # noqa: E402
-from programmers_screenshot import notifications, paths  # noqa: E402
+from programmers_screenshot import notifications, paths, recording  # noqa: E402
 from programmers_screenshot.cli import build_parser  # noqa: E402
 
 LAUNCHER = os.path.join(ROOT, "bin", "programmers-screenshot")
@@ -91,6 +91,27 @@ def main():
         "expected one argument" in result.stderr,
         result.stderr.strip().splitlines()[-1] if result.stderr else "",
     )
+
+    check.section("the status-area indicator, where the desktop supports one")
+    # A recording's only control used to be a button on a notification, and
+    # GNOME collapses a notification that carries buttons -- so Stop could be
+    # behind an expander arrow in a tray nobody has open. The indicator sits
+    # in the top bar for as long as the recording runs.
+    stopped = []
+    dot = recording.indicator(lambda: stopped.append("stop"))
+    if dot is None:
+        # The typelib is a Recommends. Without it the notification's Stop and
+        # running the command again both still work, so this is not a failure.
+        check("no typelib here, and recording is not refused over it", True,
+              "AyatanaAppIndicator3 not installed")
+    else:
+        menu, item = dot.kept
+        labels = [child.get_label() for child in menu.get_children()]
+        check("it offers exactly one thing: stopping",
+              labels == ["Stop recording"], labels)
+        item.emit("activate")
+        check("and that is wired to the stop", stopped == ["stop"], stopped)
+        dot.set_status(dot.passive)
 
     os.unlink(image)
     os.rmdir(workspace)

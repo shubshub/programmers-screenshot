@@ -266,8 +266,16 @@ programmers-screenshot --record        # ...and the same command stops it
 The overlay comes up with the region tool and nothing else, and Capture (or
 Enter) starts recording instead of taking a shot. The command exits
 immediately, printing the path it is filling, so binding one key to
-`--record` gives you start and stop on that key. The notification that sits
-there while it records has a Stop button that does the same thing.
+`--record` gives you start and stop on that key.
+
+While it runs there is a red dot in the desktop's status area — the top bar,
+beside the volume and the battery — and **Stop recording** on it ends the
+recording. That is where you look for something that is currently happening.
+It needs `gir1.2-ayatanaappindicator3-0.1`, and a desktop listening for these:
+GNOME needs the AppIndicator extension, which Ubuntu ships switched on. Without
+either, the notification that sits there while it records has its own Stop
+button — though GNOME collapses notifications that carry buttons, so it can be
+behind the expander arrow.
 
 There is also a red **record dot** on the toolbar — on the bar and on the
 floating palette both, since they are the same controls in two shapes — so an
