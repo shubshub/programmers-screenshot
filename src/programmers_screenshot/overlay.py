@@ -20,6 +20,9 @@ from .render import Renderer
 from .settings import SettingValues
 
 HINT = "Drag to mark a region  ·  Enter or Capture takes it  ·  Esc to cancel"
+RECORD_HINT = (
+    "Drag to mark a region  ·  Enter or Capture starts recording  ·  Esc to cancel"
+)
 
 GRAB_RETRY_MS = 50
 GRAB_ATTEMPTS = 20
@@ -41,9 +44,14 @@ def _shift_held(event):
 
 
 class Overlay:
-    """Runs a modal session and returns the captured pixbuf, or None."""
+    """Runs a modal session and returns the captured pixbuf, or None.
 
-    def __init__(self, pixbuf, bounds, tools):
+    With `region_only`, what comes back is the region itself rather than a
+    picture of it: a recording wants the rectangle to point ffmpeg at, and
+    nothing that gets drawn on a screenshot can be baked into a video.
+    """
+
+    def __init__(self, pixbuf, bounds, tools, region_only=False, record=False):
         # Everything about turning marks into a picture lives in the renderer;
         # this class is the window, the pointer and the toolbars around it.
         self.renderer = Renderer(pixbuf, bounds)
@@ -54,6 +62,13 @@ class Overlay:
 
         self.tools = tools
         self.active_tool = tools[0]
+        self.region_only = region_only
+        self.hint = RECORD_HINT if region_only else HINT
+        #: Whether a Record button is offered at all: whoever built this
+        #: overlay has already worked out whether this machine can record.
+        self.record = record
+        #: Set when the result is an area to record rather than a picture.
+        self.recording = False
         self.values = SettingValues()
 
         self.result = None
@@ -74,6 +89,7 @@ class Overlay:
             tools, self.monitors, self.values,
             stored.get("toolbar", preferences.BAR),
             tuple(origin) if origin else None,
+            record=record,
         )
         self._moving_palette = None   # pointer offset while dragging it
 
@@ -199,7 +215,24 @@ class Overlay:
         # the scene and nothing else, so uncommitted work would be missing
         # from the image.
         self.scene.do(self.active_tool.commit())
+        if self.region_only:
+            # The whole session was started to record something, so Capture
+            # is the button that starts it.
+            self._record_now()
+            return
         self._finish(self.render())
+
+    def _record_now(self):
+        """Finish with the area to record rather than a picture of it.
+
+        Whatever has been drawn stays behind. A recording is of the live
+        screen, and the marks were made on a frozen frame of it -- they would
+        be a still picture pasted over moving video, describing a moment that
+        has already gone.
+        """
+        self.scene.do(self.active_tool.commit())
+        self.recording = True
+        self._finish(self.capture_region())
 
     def render(self):
         """Bake the frozen screen plus every annotation into a pixbuf."""
@@ -233,6 +266,8 @@ class Overlay:
             self._choose_tool(self.toolbars.shown(button))
         elif button.kind == toolbar_module.CAPTURE:
             self._capture_now()
+        elif button.kind == toolbar_module.RECORD:
+            self._record_now()
         elif button.kind == toolbar_module.CANCEL:
             self._finish(None)
         elif button.kind == toolbar_module.SETTINGS:
@@ -295,6 +330,7 @@ class Overlay:
         self.toolbars = toolbar_module.Toolbars(
             self.tools, self.monitors, self.values, wanted,
             tuple(origin) if origin else None, self.toolbars.chosen,
+            record=self.record,
         )
         self.toolbars.show_settings_for(self.active_tool)
 
@@ -562,7 +598,7 @@ class Overlay:
         away as soon as anything is marked out.
         """
         painting.select_font(cr, theme.FONT_UI, theme.FONT_SIZE_HINT)
-        width, height = painting.text_size(cr, HINT)
+        width, height = painting.text_size(cr, self.hint)
         pad_x, pad_y = 14, 9
         for monitor in self.monitors:
             box = Rect(
@@ -572,4 +608,6 @@ class Overlay:
                 height + pad_y * 2,
             )
             painting.fill_rounded(cr, box, theme.HINT_BG)
-            painting.draw_text(cr, HINT, box.x + pad_x, box.y + pad_y, theme.HINT_TEXT)
+            painting.draw_text(
+                cr, self.hint, box.x + pad_x, box.y + pad_y, theme.HINT_TEXT
+            )

@@ -20,6 +20,7 @@ from .geometry import Rect
 
 TOOL = "tool"
 CAPTURE = "capture"
+RECORD = "record"
 CANCEL = "cancel"
 SETTINGS = "settings"   # the preferences window
 SETTING = "setting"    # one knob on the second row
@@ -42,7 +43,7 @@ class Toolbars:
     """
 
     def __init__(self, tools, monitors, values, mode=BAR, origin=None,
-                 chosen=None):
+                 chosen=None, record=False):
         self.mode = mode
         #: group name -> the member last picked from it. Shared by every bar,
         #: so choosing on one screen shows on the others.
@@ -51,9 +52,10 @@ class Toolbars:
             # One, not one each. You put it where you want it, and copies on
             # the other screens would be clutter you could not get rid of.
             self.bars = [PaletteToolbar(tools, monitors[0], values, origin,
-                                        self.chosen, monitors)]
+                                        self.chosen, monitors, record)]
         else:
-            self.bars = [Toolbar(tools, monitor, values, None, self.chosen)
+            self.bars = [Toolbar(tools, monitor, values, None, self.chosen,
+                                 None, record)
                          for monitor in monitors]
 
     @property
@@ -154,7 +156,7 @@ class Toolbar:
     """Laid out across the top of one monitor, in overlay coordinates."""
 
     def __init__(self, tools, monitor, values, origin=None, chosen=None,
-                 monitors=None):
+                 monitors=None, record=False):
         #: The tools this bar offers, ungrouped. Layout works from entries;
         #: this is what the suite reads to check every bar shows the same list.
         self.tools = tools
@@ -164,6 +166,9 @@ class Toolbar:
         #: Every monitor, for anything that can move between them.
         self.monitors = list(monitors) if monitors else [monitor]
         self.chosen = {} if chosen is None else chosen
+        #: Whether this machine can record at all. A button that cannot work
+        #: is worse than no button, so it is simply not laid out.
+        self.record = record
         self.settings_rect = None
         self.setting_buttons = []
         self.hovered = None
@@ -200,16 +205,24 @@ class Toolbar:
             Button(CAPTURE, Rect(capture_x, capture_y, theme.CAPTURE_WIDTH,
                                  theme.CAPTURE_HEIGHT))
         )
-        # Right to left: Capture, Cancel, Settings.
+        # Right to left: Capture, Cancel, Settings, and Record beyond them.
+        # Record goes on the far side so Capture and Cancel stay where the
+        # hand already expects them.
         square = theme.CAPTURE_HEIGHT
         cancel_x = capture_x - theme.TOOL_GAP - square
+        settings_x = cancel_x - theme.TOOL_GAP - square
         buttons.append(
             Button(CANCEL, Rect(cancel_x, capture_y, square, theme.CAPTURE_HEIGHT))
         )
         buttons.append(
-            Button(SETTINGS, Rect(cancel_x - theme.TOOL_GAP - square, capture_y,
+            Button(SETTINGS, Rect(settings_x, capture_y,
                                   square, theme.CAPTURE_HEIGHT))
         )
+        if self.record:
+            buttons.append(
+                Button(RECORD, Rect(settings_x - theme.TOOL_GAP - square,
+                                    capture_y, square, theme.CAPTURE_HEIGHT))
+            )
         return buttons
 
     @staticmethod
@@ -388,6 +401,8 @@ class Toolbar:
             return "Close without capturing"
         if button.kind == SETTINGS:
             return "Settings"
+        if button.kind == RECORD:
+            return "Record this area to a video"
         if button.kind == VARIANT:
             if button.setting is None:
                 return button.tool.label or None
@@ -464,6 +479,8 @@ class Toolbar:
                 self._draw_capture(cr, button)
             elif button.kind == SETTINGS:
                 self._draw_settings_button(cr, button)
+            elif button.kind == RECORD:
+                self._draw_record(cr, button)
             else:
                 self._draw_cancel(cr, button)
 
@@ -526,6 +543,14 @@ class Toolbar:
         cr.move_to(cx + arm, cy - arm)
         cr.line_to(cx - arm, cy + arm)
         cr.stroke()
+
+    def _draw_record(self, cr, button):
+        """A red dot, which is what a record button looks like everywhere."""
+        if button is self.hovered:
+            painting.fill_rounded(cr, button.rect, theme.BUTTON_HOVER)
+        rect = button.rect
+        painting.circle(cr, rect.x + rect.width / 2, rect.y + rect.height / 2,
+                        5.5, theme.RECORD_DOT)
 
     def _draw_settings_button(self, cr, button):
         """Three sliders. A cog is the convention but needs a lot of cairo to
@@ -681,21 +706,26 @@ class PaletteToolbar(Toolbar):
                   + rows * step - theme.TOOL_GAP + theme.PALETTE_ROW_GAP)
         square = theme.CAPTURE_HEIGHT
         inner = self.rect.width - pad * 2
+        # However many squares sit on the right, Capture takes the rest of the
+        # row: it is the point of the program and should not be the thing you
+        # have to hunt for.
+        squares = 3 if self.record else 2
         buttons.append(Button(
             CAPTURE,
             Rect(self.rect.x + pad, bottom,
-                 inner - (square + theme.TOOL_GAP) * 2, theme.CAPTURE_HEIGHT),
-        ))
-        buttons.append(Button(
-            SETTINGS,
-            Rect(self.rect.right - pad - square * 2 - theme.TOOL_GAP, bottom,
-                 square, theme.CAPTURE_HEIGHT),
-        ))
-        buttons.append(Button(
-            CANCEL,
-            Rect(self.rect.right - pad - square, bottom, square,
+                 inner - (square + theme.TOOL_GAP) * squares,
                  theme.CAPTURE_HEIGHT),
         ))
+        for index, kind in enumerate(
+            ((RECORD, SETTINGS, CANCEL) if self.record else (SETTINGS, CANCEL))
+        ):
+            from_right = squares - index
+            buttons.append(Button(
+                kind,
+                Rect(self.rect.right - pad - square * from_right
+                     - theme.TOOL_GAP * (from_right - 1),
+                     bottom, square, theme.CAPTURE_HEIGHT),
+            ))
         return buttons
 
     # -- settings, stacked underneath rather than strung along a row --------

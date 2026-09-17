@@ -129,6 +129,8 @@ square, the rectangle too, and lines and arrows snap to 45° angles.
     --dpr FACTOR        and its devicePixelRatio, when the page is zoomed
     --list-windows      list the windows --window can name
     --region X,Y,W,H    capture that area, no overlay
+    --record            record a region to WebM; run again to stop
+    --gif               with --record, keep a GIF instead
     --delay SECONDS     wait before the screen is read
     --recipe FILE       take the shot a JSON recipe describes ("-" is stdin)
     --recipe-help       print what a recipe can describe, and exit
@@ -254,6 +256,57 @@ in a copy of it ageing on disk. `--uninstall-skill` takes it back.
 Installing the skill does not switch recipes on. That stays a decision made in
 the settings window.
 
+## Recording
+
+```bash
+programmers-screenshot --record        # mark out an area, Capture starts it
+programmers-screenshot --record        # ...and the same command stops it
+```
+
+The overlay comes up with the region tool and nothing else, and Capture (or
+Enter) starts recording instead of taking a shot. The command exits
+immediately, printing the path it is filling, so binding one key to
+`--record` gives you start and stop on that key.
+
+While it runs there is a red dot in the desktop's status area — the top bar,
+beside the volume and the battery — and **Stop recording** on it ends the
+recording. That is where you look for something that is currently happening.
+
+No extra package for it: `StatusNotifierItem` is a D-Bus interface rather than
+a library, and the app-indicator bindings are only a wrapper round it, so the
+dot is spoken to the desktop through Gio, which is already needed. The desktop
+does have to be listening — on GNOME that is the AppIndicator extension, which
+Ubuntu ships switched on. Where nothing is, the notification that sits there
+while it records has its own Stop button, though GNOME collapses notifications
+that carry buttons so it can be behind the expander arrow.
+
+The menu exists because of how a click is read: GNOME's extension opens the
+item's menu on a single click and only calls `Activate` on a double one, so an
+item with no menu looks broken to anyone who clicks it once.
+
+There is also a red **record dot** on the toolbar — on the bar and on the
+floating palette both, since they are the same controls in two shapes — so an
+ordinary screenshot run can turn into a recording without starting again: mark
+out an area and press the dot instead of Capture. It only appears where
+recording could actually work; a button that cannot do anything is worse than
+no button. Anything drawn stays behind, because a recording is of the live
+screen and the marks were made on a frozen frame of it.
+
+`ffmpeg` does the encoding — this program never touches a frame of it — so
+recording needs it installed, and says so plainly if it is not. The result is
+`Recording_2026-09-17_11-04-02.webm` beside the screenshots, VP9, readable
+only by you from the first frame; `--gif` converts it afterwards and keeps
+that instead, which is bigger and lossier but goes in more places.
+
+Stopping sends `SIGINT`, which is how ffmpeg is asked to finish a file
+properly rather than have it truncated, so a recording is playable the moment
+it stops. Annotations are not offered: nothing drawn on a frozen frame could
+survive into a recording of the live screen.
+
+X11 only. Under Wayland the one route is the portal's screencast, which
+cannot start without somebody picking a screen in a dialog first — so a
+hotkey cannot begin one, and it refuses rather than half working.
+
 ## How it works
 
 The screen is captured *before* the overlay appears and painted back as the
@@ -328,6 +381,7 @@ src/programmers_screenshot/
         text.py                   typing, with an optional white backing
         __init__.py               ALL_TOOLS — the registry
     output.py                     saving and clipboard
+    recording.py                  --record: ffmpeg, and the toggle that stops it
     notifications.py              the notification and its buttons
     hotkey.py                     GNOME shortcut registration
     sound.py                      playing the shutter sound
@@ -441,6 +495,7 @@ python3 tests/test_multi_monitor.py   # a toolbar per screen, sharing one state
 python3 tests/test_redraw.py          # partial redraws leave no stale pixels
 python3 tests/test_notifications.py   # notification wiring and agent handoff
 python3 tests/test_sound.py           # the sound asset, generator and playback
+python3 tests/test_recording.py       # the ffmpeg command line, and the toggle
 ```
 
 They run against a real display but never show a window, and never make a

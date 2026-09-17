@@ -98,7 +98,8 @@ def render_overlay(harness):
 class Harness:
     """An Overlay with its window and exit path stubbed out."""
 
-    def __init__(self, pixbuf, bounds, tools=None, monitors=None):
+    def __init__(self, pixbuf, bounds, tools=None, monitors=None,
+                 region_only=False, record=False):
         """One monitor the size of the canvas, unless told otherwise.
 
         The overlay asks the display where the monitors are, and puts a bar at
@@ -108,13 +109,17 @@ class Harness:
         have made this suite fail for reasons that had nothing to do with the
         code. Tests that genuinely want several monitors ask for them.
         """
-        self.overlay = Overlay(pixbuf, bounds, tools or build_tools())
+        self.overlay = Overlay(
+            pixbuf, bounds, tools or build_tools(), region_only=region_only,
+            record=record,
+        )
         screens = [bounds] if monitors is None else list(monitors)
         self.overlay.monitors = screens
         self.overlay.monitor = screens[0]
         self.overlay.toolbars = toolbar.Toolbars(
             self.overlay.tools, screens, self.overlay.values,
             self.overlay.toolbars.mode, None, self.overlay.toolbars.chosen,
+            record=self.overlay.record,
         )
         self.overlay.toolbars.show_settings_for(self.overlay.active_tool)
         self.overlay.window = types.SimpleNamespace(

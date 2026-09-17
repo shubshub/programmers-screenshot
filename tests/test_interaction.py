@@ -19,6 +19,7 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 from support import Checker, Harness  # noqa: E402
 
 from programmers_screenshot import capture, toolbar  # noqa: E402
+from programmers_screenshot.tools import RectangleTool  # noqa: E402
 
 
 def main():
@@ -185,6 +186,57 @@ def main():
         (h.result.get_width(), h.result.get_height()) == (321, 234),
         "%dx%d" % (h.result.get_width(), h.result.get_height()),
     )
+
+    check.section("a recording's overlay hands back the region, not a picture")
+    # --record wants the rectangle to point ffmpeg at. The frozen frame it is
+    # marked out on is only a backdrop: the recording is of the live screen,
+    # so a picture of that frame would be the wrong thing entirely.
+    h = Harness(pixbuf, bounds, tools=[RectangleTool()], region_only=True)
+    x, y = h.canvas_point()
+    h.drag(x, y, 260, 140)
+    h.click_button(toolbar.CAPTURE)
+    check("finished", h.finished)
+    check(
+        "it is the region that comes back",
+        h.result is not None and (h.result.width, h.result.height) == (260, 140),
+        h.result and "%gx%g" % (h.result.width, h.result.height),
+    )
+    check("and not an image of it", not hasattr(h.result, "get_pixels"))
+
+    check.section("the Record button takes the area, not a picture of it")
+    # The other way in: an ordinary screenshot session, where Record is a
+    # button beside Capture rather than the reason the overlay came up.
+    h = Harness(pixbuf, bounds, record=True)
+    x, y = h.canvas_point()
+    h.drag(x, y, 300, 180)
+    h.use_tool("pen")
+    h.drag(x + 20, y + 20, 60, 40)          # something drawn on the frozen frame
+    check("there is a mark on the scene", len(h.items) == 1, len(h.items))
+
+    h.click_button(toolbar.RECORD)
+    check("finished", h.finished)
+    check("it says it is a recording", h.overlay.recording)
+    check(
+        "and hands back the area that was marked out",
+        h.result is not None and (h.result.width, h.result.height) == (300, 180),
+        h.result and "%gx%g" % (h.result.width, h.result.height),
+    )
+    check("not a picture of it", not hasattr(h.result, "get_pixels"))
+
+    check.section("without the button, Capture still means a screenshot")
+    h = Harness(pixbuf, bounds)
+    check("no Record button is laid out",
+          not any(b.kind == toolbar.RECORD for b in h.bar.buttons))
+    x, y = h.canvas_point()
+    h.drag(x, y, 120, 90)
+    h.click_button(toolbar.CAPTURE)
+    check("a picture comes back", hasattr(h.result, "get_pixels"))
+    check("and nothing thinks it is recording", not h.overlay.recording)
+
+    check.section("cancelling a recording's overlay starts nothing")
+    h = Harness(pixbuf, bounds, tools=[RectangleTool()], region_only=True)
+    h.key("Escape")
+    check("nothing comes back", h.finished and h.result is None, h.result)
 
     return check.report()
 

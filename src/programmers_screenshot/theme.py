@@ -17,6 +17,8 @@ BUTTON_ICON_ACTIVE = ACCENT
 
 CAPTURE_BG = ACCENT
 CAPTURE_TEXT = (1, 1, 1)
+# The same red the marks are drawn in: a record dot is red everywhere else too.
+RECORD_DOT = (0.91, 0.24, 0.24)
 
 LABEL_BG = (0, 0, 0, 0.78)
 LABEL_TEXT = (1, 1, 1)

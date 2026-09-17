@@ -187,7 +187,7 @@ def main():
 
         def overlay_that_changes_the_setting(pixbuf, bounds):
             preferences.save({"save": False, "directory": None})
-            return pixbuf
+            return cli.Outcome(pixbuf, None)
 
         cli.run_overlay = overlay_that_changes_the_setting
         cli.output.deliver = lambda pixbuf, opts: delivered.update(

@@ -92,6 +92,11 @@ codes. What is below is only what to know before reading it.
 - `--input FILE --viewport WIDTH --dpr RATIO` - annotate a picture something
   else took, which is how a browser tab is done.
 
+There is no fourth way for a recording. `--record` takes a WebM of a region
+instead of a picture of it, but it is driven by the person at the keyboard --
+they mark out the area, and the same command again stops it -- so it is
+something to tell them about, not something to script.
+
 ## A browser tab, with Claude in Chrome
 
 Two tool calls, from the session that has the Chrome tools connected

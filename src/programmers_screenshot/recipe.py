@@ -530,6 +530,11 @@ REQUIREMENTS
   Off until switched on: tick "Let a recipe drive captures" in the settings
   window (the sliders button on the overlay toolbar).
 
+  A recipe describes a still, and there is no recording in one. --record is
+  for the person at the keyboard: it marks out an area through the overlay,
+  and the same command again stops it. Nothing a recipe draws could survive
+  into a video of the live screen anyway.
+
 WORTH KNOWING
   This photographs whatever is really there, which may not be what you expect:
   a password manager, somebody's message, a token in a terminal. Name a window

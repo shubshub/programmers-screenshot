@@ -1,6 +1,7 @@
 """Command line entry point."""
 
 import argparse
+import collections
 import copy
 import os
 import sys
@@ -16,7 +17,7 @@ from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 from . import (  # noqa: I101
     alerts, capture, hotkey, notifications, output, paths, preferences, recipe,
-    skill, tools, updates,
+    recording, skill, tools, updates,
 )
 from .geometry import Rect
 from .overlay import Overlay
@@ -28,6 +29,10 @@ VERSION = "0.27.2"
 EXIT_OK = 0
 EXIT_CANCELLED = 1
 EXIT_BAD_USAGE = 2
+
+#: What the overlay came back with. Exactly one is set: a picture to deliver,
+#: or an area to record. Cancelling gives None instead of either.
+Outcome = collections.namedtuple("Outcome", "image area")
 
 
 def build_parser():
@@ -82,6 +87,14 @@ def build_parser():
         "corrects for a browser save cropped at a page zoom",
     )
     parser.add_argument(
+        "--record", action="store_true",
+        help="record a region to WebM; run again to stop",
+    )
+    parser.add_argument(
+        "--gif", action="store_true",
+        help="with --record, convert the recording to a GIF",
+    )
+    parser.add_argument(
         "--delay", metavar="SECONDS", type=float, default=0,
         help="wait this long before the screen is captured",
     )
@@ -121,6 +134,8 @@ def build_parser():
     parser.add_argument(
         "--notification-agent", metavar="FILE", help=argparse.SUPPRESS
     )
+    # Internal: the detached process that owns a recording while it runs.
+    parser.add_argument("--record-agent", metavar="JSON", help=argparse.SUPPRESS)
     # Internal: an alert window carrying one link button, as JSON.
     parser.add_argument("--alert", metavar="JSON", help=argparse.SUPPRESS)
     # Internal: the detached update check, run well after any capture.
@@ -158,6 +173,13 @@ def _utility_command(options):
         return EXIT_OK
     if options.notification_agent:
         return notifications.run_agent(options.notification_agent)
+    if options.record_agent:
+        return recording.run_agent(options.record_agent)
+    if options.record and recording.stop_running():
+        # The same key starts and stops one, so a --record while a recording
+        # is running means stop. Before the display is touched: there is no
+        # overlay to show and nothing to photograph.
+        return EXIT_OK
     if options.alert:
         return alerts.run(options.alert)
     if options.check_updates:
@@ -255,14 +277,18 @@ def _deliver(pixbuf, bounds, options, spec, quiet):
             return EXIT_BAD_USAGE
         output.deliver(captured, with_preferences(options), quiet)
     else:
-        captured = run_overlay(pixbuf, bounds)
-        if captured is None:
+        outcome = run_overlay(pixbuf, bounds)
+        if outcome is None:
             return EXIT_CANCELLED
+        if outcome.area is not None:
+            # The Record button, rather than Capture: nothing is delivered
+            # here, and what happens next is a recording of the live screen.
+            return _begin_recording(outcome.area, pixbuf, bounds, options)
         # After the overlay, not before: the settings window writes the file
         # while the overlay is up, and the capture in hand has to honour what
         # it says. Reading at startup meant a change only took effect from the
         # next run.
-        output.deliver(captured, with_preferences(options))
+        output.deliver(outcome.image, with_preferences(options))
     after_capture(options)
     return EXIT_OK
 
@@ -303,10 +329,45 @@ def main(argv=None):
         sys.stderr.write("%s\n" % error)
         return EXIT_CANCELLED
 
+    if options.record:
+        return _start_recording(pixbuf, bounds, options)
+
     # --input photographed nothing, so there is no shot to announce.
     quiet = bool(options.input)
 
     return _deliver(pixbuf, bounds, options, spec, quiet)
+
+
+def _start_recording(pixbuf, bounds, options):
+    """Mark out an area with the overlay, then hand it to ffmpeg.
+
+    The frozen screen is the same one a screenshot is marked out on, and it is
+    only a backdrop here: what comes back is the rectangle, and the recording
+    is of the live screen inside it. Only the region tool is offered, because
+    nothing drawn on a still frame could survive into a video.
+    """
+    refusal = recording.unavailable(Gdk.Display.get_default())
+    if refusal:
+        sys.stderr.write("%s\n" % refusal)
+        return EXIT_CANCELLED
+
+    outcome = run_overlay(pixbuf, bounds, region_only=True)
+    if outcome is None:
+        return EXIT_CANCELLED
+    return _begin_recording(outcome.area, pixbuf, bounds, options)
+
+
+def _begin_recording(area, pixbuf, bounds, options):
+    """Hand an area marked out on the overlay to the recorder.
+
+    The overlay works in logical pixels from the corner of the frozen screen;
+    what ffmpeg wants is physical pixels from the corner of the root window,
+    and the capture already knows the factor between them.
+    """
+    return recording.start(
+        recording.area_of(area, bounds, capture.pixel_scale(pixbuf, bounds)),
+        with_preferences(options),
+    )
 
 
 def scripted(options):
@@ -427,13 +488,29 @@ def with_preferences(options):
     return effective
 
 
-def run_overlay(pixbuf, bounds):
-    """Run the overlay and return the captured pixbuf, or None if cancelled.
+def run_overlay(pixbuf, bounds, region_only=False):
+    """Run the overlay and return an Outcome, or None if it was cancelled.
 
-    The overlay renders it rather than returning a rectangle to crop, because
-    only it knows about the annotations that have to be baked in.
+    The overlay renders a capture itself rather than returning a rectangle to
+    crop, because only it knows about the annotations that have to be baked
+    in. A recording is the other way round: what comes back is the area, since
+    there is nothing to bake into a video of the live screen.
+
+    The Record button is only offered when this machine could actually record.
+    A button that cannot work is worse than no button, and --record has
+    already said so plainly by the time it gets here.
     """
-    return Overlay(pixbuf, bounds, tools.build_tools()).run()
+    can_record = recording.unavailable(Gdk.Display.get_default()) is None
+    overlay = Overlay(
+        pixbuf, bounds,
+        [tools.RectangleTool()] if region_only else tools.build_tools(),
+        region_only=region_only,
+        record=can_record and not region_only,
+    )
+    result = overlay.run()
+    if result is None:
+        return None
+    return Outcome(None, result) if overlay.recording else Outcome(result, None)
 
 
 def cairo_is_usable():
