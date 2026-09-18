@@ -60,6 +60,14 @@ class RemoveItem(Action):
         self._position = None
 
     def apply(self, scene):
+        if self.item not in scene.items:
+            # A text edit removes the old item while its replacement is being
+            # typed, before this compound action enters the undo history.
+            # Keep that already-applied removal idempotent when the action is
+            # recorded by Scene.do().
+            if self._position is None:
+                self._position = scene.items.index(self.item)
+            return
         self._position = scene.items.index(self.item)
         scene.items.pop(self._position)
 

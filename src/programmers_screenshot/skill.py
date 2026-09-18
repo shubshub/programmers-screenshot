@@ -71,7 +71,8 @@ description: >-
 ---
 
 `programmers-screenshot` takes an annotated shot from a JSON recipe, with
-nobody at the keyboard.
+nobody at the keyboard. In the interactive overlay, click an existing text
+annotation to edit it; clicking elsewhere commits the replacement.
 
 ## Read the reference first
 

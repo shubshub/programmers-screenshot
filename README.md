@@ -92,7 +92,7 @@ screen.
 | Redact | Drag a bar that covers something completely | Fill (black or white) |
 | Pixelate | Drag to break an area into coarse blocks | Block size |
 | Step | Click to drop numbered badges: 1, 2, 3… | Size, colour |
-| Text | Click, type, click away. Enter makes a new line | Size, backing, colour |
+| Text | Click to type; click existing text to edit; click away to commit. Enter makes a new line | Size, backing, colour |
 
 **Redact secrets, pixelate clutter.** The redaction bar is opaque, so nothing
 of what was underneath survives into the saved PNG. Pixelation only *averages*
