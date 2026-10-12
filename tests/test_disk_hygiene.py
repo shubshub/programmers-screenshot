@@ -317,8 +317,8 @@ def main():
         pixbuf = grab_through(portal)
         check("it returns an image", pixbuf is not None)
         check("it listened on the request path it asked for",
-              (portal.subscribed_to or "").endswith("/1_42/programmers_screenshot_%d"
-                                                    % os.getpid()),
+              "/1_42/programmers_screenshot_%d_" % os.getpid()
+              in (portal.subscribed_to or ""),
               portal.subscribed_to)
         check("the file the portal wrote is gone",
               not os.path.exists(portal.written_to), portal.written_to)

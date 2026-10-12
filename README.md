@@ -271,14 +271,16 @@ immediately, printing the path it is filling, so binding one key to
 
 While it runs a small bar — a red dot, the time so far, and **Stop** — sits
 just outside the recorded area, below it if there is room, else above or
-beside it. Outside, because ffmpeg records every pixel in the area and X11
-has no way to leave one window out of that; the bar is never in the video.
+beside it. Outside, because the recording takes every pixel in the area and
+neither X11 nor the Wayland portal can leave one window out of that; the bar
+is never in the video.
 If the area fills every monitor there is nowhere for it to go unseen, so it
 is not shown, and the controls below are still there.
 
 To record sound as well, pick a microphone on the **Mic** row under the
 toolbar while the Region tool is active: **None**, then every input PulseAudio
-or PipeWire reports. The choice is remembered for next time. `--mic` with
+or PipeWire reports (the list comes from `pactl`, in `pulseaudio-utils`;
+without it the row is not shown). The choice is remembered for next time. `--mic` with
 nothing picked uses whichever microphone the sound settings have chosen. The
 sound goes into the same WebM as Opus; a GIF has none, so `--gif` is silent.
 
@@ -317,9 +319,18 @@ properly rather than have it truncated, so a recording is playable the moment
 it stops. Annotations are not offered: nothing drawn on a frozen frame could
 survive into a recording of the live screen.
 
-X11 only. Under Wayland the one route is the portal's screencast, which
-cannot start without somebody picking a screen in a dialog first — so a
-hotkey cannot begin one, and it refuses rather than half working.
+Under Wayland no program may read the screen, so the recording goes through
+the desktop portal's screencast instead: the portal shares the monitor the
+area is on as a PipeWire stream, and GStreamer (`gst-launch-1.0`, from
+`gstreamer1.0-tools` and `gstreamer1.0-pipewire`) crops it to the area and
+writes a VP8 WebM, with the microphone as Opus. The first time, the desktop
+asks which screen to share; pick the one the area is on, or several. It hands
+back a token that skips the question after that, kept in `state.json`, so a
+hotkey can start one. An area on a screen that was not shared fails with a
+notification saying so, and the next recording asks again. The Stop bar is
+placed through XWayland, since a Wayland window cannot choose where it goes;
+without XWayland there is no bar, and the dot and the second keypress still
+stop it.
 
 ## How it works
 
@@ -395,7 +406,7 @@ src/programmers_screenshot/
         text.py                   typing, with an optional white backing
         __init__.py               ALL_TOOLS — the registry
     output.py                     saving and clipboard
-    recording.py                  --record: ffmpeg, and the toggle that stops it
+    recording.py                  --record: ffmpeg or the portal and GStreamer, and the toggle
     notifications.py              the notification and its buttons
     hotkey.py                     GNOME shortcut registration
     sound.py                      playing the shutter sound

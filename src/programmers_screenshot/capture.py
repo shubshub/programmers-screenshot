@@ -1,6 +1,7 @@
 """Getting pixels off the screen, on X11 and on Wayland."""
 
 import contextlib
+import itertools
 import os
 import tempfile
 
@@ -241,30 +242,25 @@ def _grab_from_gnome_shell():
 
 
 PORTAL = "org.freedesktop.portal.Desktop"
+PORTAL_PATH = "/org/freedesktop/portal/desktop"
+_tokens = itertools.count()
 
 
-def _grab_from_portal():
-    """Every Wayland session that is not GNOME: the desktop portal.
+def portal_request(bus, interface, method, signature, arguments, options,
+                   seconds=30):
+    """Call one portal method and wait for its answer: the results, or None.
 
-    org.gnome.Shell.Screenshot is GNOME's own interface and exists nowhere
-    else, so on KDE, sway, Hyprland or COSMIC the capture has to go through
-    xdg-desktop-portal instead. The portal answers asynchronously: the call
-    returns a Request object path and the picture arrives later as a signal
-    on it, so this waits on a main loop. The subscription goes on first, to
-    the path the spec says the token will produce, because a fast portal can
-    answer before the call returns.
-
-    Like the Shell, it leaves the raw screen in a file of its choosing, which
-    gets removed for the same reason: a copy on disk would outlive any
-    redaction drawn on the capture we keep.
+    None when it refused, was cancelled, or did not answer in `seconds`. The
+    portal answers asynchronously: the call returns a Request object path and
+    the results arrive later as a signal on it, so this waits on a main loop.
+    The subscription goes on first, to the path the spec says the token will
+    produce, because a fast portal can answer before the call returns.
+    `options` is the method's a{sv}, which the token is added to; it goes last
+    in `signature`, after `arguments`.
     """
-    try:
-        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-    except GLib.Error:
-        return None
-
-    token = "programmers_screenshot_%d" % os.getpid()
-    request_path = "/org/freedesktop/portal/desktop/request/%s/%s" % (
+    token = "programmers_screenshot_%d_%d" % (os.getpid(), next(_tokens))
+    request_path = "%s/request/%s/%s" % (
+        PORTAL_PATH,
         bus.get_unique_name()[1:].replace(".", "_"),
         token,
     )
@@ -273,7 +269,7 @@ def _grab_from_portal():
 
     def responded(_bus, _sender, _path, _interface, _signal, parameters):
         code, results = parameters.unpack()
-        answer["uri"] = results.get("uri") if code == 0 else None
+        answer["results"] = results if code == 0 else None
         loop.quit()
 
     def give_up():
@@ -289,17 +285,15 @@ def _grab_from_portal():
         Gio.DBusSignalFlags.NONE,
         responded,
     )
-    timeout = GLib.timeout_add_seconds(30, give_up)
+    timeout = GLib.timeout_add_seconds(seconds, give_up)
+    options = dict(options, handle_token=GLib.Variant("s", token))
     try:
         bus.call_sync(
             PORTAL,
-            "/org/freedesktop/portal/desktop",
-            "org.freedesktop.portal.Screenshot",
-            "Screenshot",
-            GLib.Variant("(sa{sv})", ("", {
-                "handle_token": GLib.Variant("s", token),
-                "interactive": GLib.Variant("b", False),
-            })),
+            PORTAL_PATH,
+            interface,
+            method,
+            GLib.Variant(signature, tuple(arguments) + (options,)),
             GLib.VariantType("(o)"),
             Gio.DBusCallFlags.NONE,
             10000,
@@ -311,10 +305,32 @@ def _grab_from_portal():
     finally:
         bus.signal_unsubscribe(subscription)
         GLib.source_remove(timeout)
+    return answer.get("results")
 
-    if not answer.get("uri"):
+
+def _grab_from_portal():
+    """Every Wayland session that is not GNOME: the desktop portal.
+
+    org.gnome.Shell.Screenshot is GNOME's own interface and exists nowhere
+    else, so on KDE, sway, Hyprland or COSMIC the capture has to go through
+    xdg-desktop-portal instead.
+
+    Like the Shell, it leaves the raw screen in a file of its choosing, which
+    gets removed for the same reason: a copy on disk would outlive any
+    redaction drawn on the capture we keep.
+    """
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    except GLib.Error:
         return None
-    path = GLib.filename_from_uri(answer["uri"])[0]
+
+    results = portal_request(
+        bus, "org.freedesktop.portal.Screenshot", "Screenshot", "(sa{sv})",
+        ("",), {"interactive": GLib.Variant("b", False)},
+    )
+    if not results or not results.get("uri"):
+        return None
+    path = GLib.filename_from_uri(results["uri"])[0]
     try:
         return GdkPixbuf.Pixbuf.new_from_file(path)
     except GLib.Error:

@@ -140,6 +140,51 @@ def main():
     check("and the file is still the last word", heard[-1] == "/tmp/out.webm")
 
     # ----------------------------------------------------------------------
+    check.section("under Wayland: which shared monitor, and the GStreamer line")
+
+    # The monitors on the machine this was written on: the 1920x1200 sits to
+    # the right of the 3440x1440, 240 pixels down, as the portal reported it.
+    streams = [
+        (83, {"position": (3440, 240), "size": (1920, 1200)}),
+        (84, {"position": (0, 0), "size": (3440, 1440)}),
+    ]
+    on_right = recording.area_of(rect(3540, 290, 400, 300), screen, 1.0)
+    chosen = recording.stream_for(on_right, 1.0, streams)
+    check("the stream holding the area is the one recorded",
+          chosen and chosen[0] == 83, chosen)
+    on_left = recording.area_of(rect(100, 100, 400, 300), screen, 1.0)
+    check("and the other monitor's area picks the other stream",
+          recording.stream_for(on_left, 1.0, streams)[0] == 84)
+    check("an area on no shared monitor gets nothing, so it can ask again",
+          recording.stream_for(on_left, 1.0, streams[:1]) is None)
+    doubled = recording.area_of(rect(3540, 290, 400, 300), screen, 2.0)
+    check("at scale 2 the stream is met in physical pixels",
+          recording.stream_for(doubled, 2.0, streams)[1] == Rect(6880, 480, 3840, 2400),
+          recording.stream_for(doubled, 2.0, streams))
+
+    node, where = chosen
+    gst = recording.screencast_command("/tmp/a b.webm", on_right, 7, node, where)
+    words = dict(word.split("=", 1) for word in gst if "=" in word and "," not in word)
+    check("it is gst-launch, stopping cleanly on SIGINT", gst[:3] == ["gst-launch-1.0", "-q", "-e"],
+          gst[:3])
+    check("from the portal's PipeWire connection",
+          (words.get("fd"), words.get("path")) == ("7", "83"), words)
+    check("cropped to the area, relative to its monitor",
+          [words.get(k) for k in ("left", "top", "right", "bottom")]
+          == ["100", "50", "1420", "850"], words)
+    check("a path with a space stays one word",
+          "location=/tmp/a b.webm" in gst, gst)
+    check("without --mic there is no sound", "pulsesrc" not in gst)
+    named = recording.screencast_command("/tmp/o.webm", on_right, 7, node, where,
+                                         mic="alsa_input.usb-mic")
+    check("a microphone is a pulse source, by its name, as Opus",
+          "device=alsa_input.usb-mic" in named and "opusenc" in named, named)
+    either = recording.screencast_command("/tmp/o.webm", on_right, 7, node, where,
+                                          mic="default")
+    check("and --mic with none picked leaves the choice to the desktop",
+          "pulsesrc" in either and not any(w.startswith("device=") for w in either))
+
+    # ----------------------------------------------------------------------
     check.section("the microphones offered on the toolbar")
 
     # The two on the machine this was written on: one sound card, so the
@@ -292,9 +337,14 @@ def main():
         recording.PROGRAM = "sleep"  # something that is certainly installed
         check("with it, an X11 session can record",
               recording.unavailable(X11Display()) is None)
-        refusal = recording.unavailable(FakeDisplay())
-        check("under Wayland it refuses rather than half-working",
-              refusal and "X11" in refusal, refusal)
+        real_gst = recording.GST
+        try:
+            recording.GST = "no-such-program-anywhere"
+            refusal = recording.unavailable(FakeDisplay())
+            check("under Wayland without GStreamer it names the packages",
+                  refusal and "gstreamer1.0-pipewire" in refusal, refusal)
+        finally:
+            recording.GST = real_gst
 
         # ------------------------------------------------------------------
         check.section("the second press stops the first recording")
