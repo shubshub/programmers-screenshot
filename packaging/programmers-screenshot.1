@@ -50,22 +50,25 @@ dismissed, when a button is pressed, or after five minutes.
 marks out an area the same way a screenshot does, then hands it to
 .BR ffmpeg (1),
 which does the encoding: this program never touches a frame of it. Without
-ffmpeg installed it exits 1 and says so.
+ffmpeg installed it exits 1 and says so. Under Wayland GStreamer does the
+same job instead; see
+.B Under Wayland
+below.
 .PP
 The overlay offers the same thing without the flag: a red record dot sits
 beside
 .BR Capture ,
 on the bar and on the floating palette alike, and pressing it records the area
 marked out instead of photographing it. It is laid out only where recording
-would work \- with ffmpeg installed, under X11 \- since a button that cannot
+would work \- with ffmpeg under X11, with GStreamer under Wayland \- since a button that cannot
 do anything is worse than no button at all. Annotations are left behind: a
 recording is of the live screen, and the marks were made on a frozen frame of
 it.
 .SS Stopping one
 While a recording runs, a small bar \- a red dot, the time so far and
 \fBStop\fR \- sits just outside the recorded area: below it, else above or
-beside it. ffmpeg records every pixel in the area and X11 cannot leave a
-window out of that, so the bar is kept out of the area instead and never
+beside it. The recording takes every pixel in the area and neither X11 nor
+the Wayland portal can leave a window out of that, so the bar is kept out of the area instead and never
 appears in the video. When the area fills every monitor there is nowhere
 for it, and it is not shown.
 .PP
@@ -84,7 +87,7 @@ and a second
 .B \-\-record
 sends it
 .BR SIGINT ,
-which is how ffmpeg is asked to finalise a file rather than truncate it. The
+which is how ffmpeg, or gst\-launch\-1.0 under Wayland, is asked to finalise a file rather than truncate it. The
 notification that sits there while it records carries a \fBStop\fR button
 that does exactly the same thing. A recording left running by a killed
 helper is noticed and ignored rather than signalled, since the pid may since
@@ -95,10 +98,23 @@ The file is
 beside the screenshots and readable only by its owner, from the first frame:
 it holds a video of a screen. Annotations are not offered, because nothing
 drawn on a frozen frame could survive into a recording of the live screen.
+.SS Under Wayland
+No program may read the screen under Wayland, so the recording goes through
+the desktop portal's screencast. The portal shares the monitor the area is
+on as a PipeWire stream, and
+.BR gst\-launch\-1.0 (1)
+crops it to the area and writes a VP8 WebM, with the microphone as Opus. It
+needs gstreamer1.0\-tools, gstreamer1.0\-pipewire and
+gstreamer1.0\-plugins\-good, and says so if they are missing.
 .PP
-X11 only. Under Wayland the one route is the desktop portal's screencast,
-which cannot begin without somebody choosing a screen in a dialog first, so a
-hotkey cannot start one; it refuses with a message instead of half working.
+The first time, the desktop asks which screen to share: pick the one the
+area is on, or several. It hands back a token that skips the question after
+that, kept in
+.IR state.json ,
+so a hotkey can start one. An area on a screen that was not shared fails
+with a notification, and the next recording asks again. The Stop bar is
+placed through XWayland, since a Wayland window cannot choose where it goes;
+without XWayland there is no bar.
 .SH TOOLS
 .TP
 .B Region
@@ -341,7 +357,10 @@ With
 record the microphone too, as Opus in the same WebM. The microphone is the
 one picked on the \fBMic\fR row under the toolbar, which appears with the
 Region tool when recording is possible and lists \fBNone\fR and then every
-input PulseAudio or PipeWire reports; it is remembered. With nothing picked,
+input PulseAudio or PipeWire reports, as listed by
+.BR pactl (1)
+from pulseaudio\-utils; without it the row is not shown. The pick is
+remembered. With nothing picked,
 the desktop's default input. Ignored with
 .BR \-\-gif ,
 which has no sound.

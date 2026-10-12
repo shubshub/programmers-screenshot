@@ -13,6 +13,10 @@ Depends: python3 (>= 3.8),
          xclip | wl-clipboard
 Recommends: gir1.2-wnck-3.0,
             ffmpeg,
+            gstreamer1.0-tools,
+            gstreamer1.0-pipewire,
+            gstreamer1.0-plugins-good,
+            pulseaudio-utils,
             nautilus | dolphin | nemo | thunar,
             gnome-session-canberra | pulseaudio-utils | pipewire-bin | alsa-utils
 Maintainer: Shubshub
@@ -39,8 +43,9 @@ Description: Minimal region screenshot tool for hotkey binding
  region, a delay, and boxes, arrows, numbered steps, labels, redactions and
  pixelation. Off until switched on in the settings window.
  .
- --record records a region to a WebM instead, driving ffmpeg; the same
- key again stops it. X11 only, and needs ffmpeg.
+ --record records a region to a WebM instead, driving ffmpeg under X11
+ and the desktop portal with GStreamer under Wayland; the same key again
+ stops it.
  .
  Works on GNOME under X11 and Wayland, and spans multi-monitor layouts.
  Naming a window with --window needs X11 and gir1.2-wnck-3.0.

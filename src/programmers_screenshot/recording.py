@@ -1,4 +1,4 @@
-"""Recording a region of the screen, by driving ffmpeg.
+"""Recording a region of the screen, by driving ffmpeg or GStreamer.
 
 Nothing here encodes anything. That is ffmpeg's job, the same way the shutter
 sound and the clipboard are other programs' jobs: this owns where the file
@@ -12,6 +12,13 @@ notification with the Stop button on it; and the next --record finds the
 agent's ffmpeg through state.json and interrupts it, which is what makes the
 same hotkey a toggle. ffmpeg finalises the file on SIGINT, so stopping it that
 way leaves a playable recording rather than a truncated one.
+
+Under Wayland no program may read the screen, so the agent asks the desktop
+portal to share the monitor the region is on and records that PipeWire stream
+with gst-launch-1.0 instead, which finalises on SIGINT too when run with -e.
+The portal asks somebody to pick a screen the first time; it hands back a
+token that skips the question after that, which is what lets a hotkey start
+one.
 """
 
 import contextlib
@@ -29,6 +36,7 @@ from .geometry import Rect
 from .paths import spawn_detached
 
 PROGRAM = "ffmpeg"
+GST = "gst-launch-1.0"
 FILENAME_FORMAT = "Recording_%Y-%m-%d_%H-%M-%S"
 FRAMERATE = 25
 # Recordings hold whatever screenshots hold, so they land as privately.
@@ -37,10 +45,19 @@ FILE_MODE = output.FILE_MODE
 MISSING = (
     "recording needs ffmpeg: sudo apt install ffmpeg"
 )
-NO_WAYLAND = (
-    "recording needs an X11 session. Under Wayland the only route is the\n"
-    "portal's screencast, which cannot start without somebody picking the\n"
-    "screen in a dialog first -- so a hotkey cannot begin one."
+NO_GSTREAMER = (
+    "recording under Wayland needs GStreamer and its PipeWire source:\n"
+    "sudo apt install gstreamer1.0-tools gstreamer1.0-pipewire "
+    "gstreamer1.0-plugins-good"
+)
+NO_PORTAL = (
+    "the desktop portal would not share the screen (needs xdg-desktop-portal "
+    "and the backend for this desktop)"
+)
+NOT_SHARED = "no screen was picked to share"
+WRONG_SCREEN = (
+    "the screen shared is not the one the area is on; record again and pick "
+    "that one"
 )
 
 # One pass, so the palette is made from the same frames it is applied to.
@@ -53,13 +70,19 @@ ICON = "media-record"  # the red dot, from the desktop's own icon theme
 
 def unavailable(display):
     """Why this machine cannot record, or None if it can."""
-    if not shutil.which(PROGRAM):
-        return MISSING
     from .capture import is_x11  # here: capture pulls in Gdk, this module need not
 
-    if not is_x11(display):
-        return NO_WAYLAND
-    return None
+    if is_x11(display):
+        return None if shutil.which(PROGRAM) else MISSING
+    try:
+        found = subprocess.run(
+            ["gst-inspect-1.0", "--exists", "pipewiresrc"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=5, check=False,
+        ).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        found = False
+    return None if found and shutil.which(GST) else NO_GSTREAMER
 
 
 # --------------------------------------------------------------------------
@@ -79,7 +102,7 @@ def running():
     pid = state.load().get("recording")
     try:
         with open("/proc/%d/comm" % pid, "r", encoding="utf-8") as handle:
-            return pid if handle.read().strip() == PROGRAM else None
+            return pid if handle.read().strip() in (PROGRAM, GST) else None
     except (OSError, TypeError):
         return None
 
@@ -90,7 +113,7 @@ def stop_running():
     if pid is None:
         return False
     with contextlib.suppress(OSError):
-        os.kill(pid, signal.SIGINT)  # ffmpeg finalises the file and exits
+        os.kill(pid, signal.SIGINT)  # either one finalises the file and exits
     return True
 
 
@@ -196,13 +219,162 @@ def command(path, area, mic=None):
     ]
 
 
-def start(area, options, scale=1.0):
+def screencast_command(path, area, fd, node, stream, mic=None):
+    """The gst-launch-1.0 that fills `path` from `area` of a portal stream.
+
+    `stream` is where the shared monitor sits, in the same physical pixels as
+    `area`; `fd` and `node` are the PipeWire connection the portal opened.
+    The frames are scaled to the monitor's size in those pixels before the
+    crop, so the crop lands where the overlay said. That is a no-op at a
+    whole-number scale, which is what the portal sends.
+
+    VP8 rather than ffmpeg's VP9: it keeps up in real time on a whole
+    monitor, and it is what GNOME's own recorder used. Same WebM either way.
+    """
+    # ponytail: fractional scaling resamples the frames, slightly soft; read
+    # the stream's own size from its caps if that ever shows.
+    width, height = int(round(stream.width)), int(round(stream.height))
+    left = max(0, int(area.x - stream.x))
+    top = max(0, int(area.y - stream.y))
+    right = max(0, width - left - area.width)
+    bottom = max(0, height - top - area.height)
+    line = [GST, "-q", "-e", "webmmux", "name=mux", "!",
+            "filesink", "location=" + path]
+    # keepalive-time repeats the last frame while nothing on screen changes:
+    # PipeWire sends none then, and a still screen would stop the clock.
+    line += (
+        "pipewiresrc fd=%d path=%d do-timestamp=true keepalive-time=1000"
+        " ! videoscale ! video/x-raw,width=%d,height=%d"
+        " ! videocrop left=%d top=%d right=%d bottom=%d"
+        " ! videorate ! video/x-raw,framerate=%d/1 ! videoconvert ! queue"
+        " ! vp8enc deadline=1 cpu-used=8 end-usage=cq cq-level=10"
+        " target-bitrate=20000000 threads=%d ! queue ! mux."
+        % (fd, node, width, height, left, top, right, bottom, FRAMERATE,
+           min(os.cpu_count() or 1, 8))
+    ).split()
+    if mic:
+        line.append("pulsesrc")
+        if mic != "default":  # the one the sound settings picked
+            line.append("device=" + mic)
+        line += "! audioconvert ! audioresample ! opusenc ! queue ! mux.".split()
+    return line
+
+
+SCREENCAST = "org.freedesktop.portal.ScreenCast"
+MONITOR = 1
+EMBEDDED_CURSOR = 2
+PERSIST_UNTIL_REVOKED = 2
+CHOOSING_SECONDS = 300  # somebody is reading a dialog
+
+
+# The portal ends a session when the connection that opened it closes, and Gio
+# closes the shared connection once nothing refers to it: held here, it lasts
+# as long as the agent, which is as long as the recording.
+_connections = []
+
+
+class Refused(Exception):
+    """The portal would not share the screen, or not the part asked for."""
+
+
+def screencast(area, scale):
+    """Have the portal share the monitor `area` is on: (fd, node, stream).
+
+    The token from last time goes in with the request, so the dialog only
+    comes up the first time, or when the token stops working. The new token
+    is kept whatever happens next. Raises Refused, with the reason to show.
+    The session lives as long as this process's bus connection.
+    """
+    from .capture import PORTAL, PORTAL_PATH, portal_request
+
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    except GLib.Error:
+        raise Refused(NO_PORTAL) from None
+    _connections.append(bus)
+    created = portal_request(
+        bus, SCREENCAST, "CreateSession", "(a{sv})", (),
+        {"session_handle_token": GLib.Variant("s", "programmers_screenshot")},
+    )
+    if not created:
+        raise Refused(NO_PORTAL)
+    session = created["session_handle"]
+
+    options = {
+        "types": GLib.Variant("u", MONITOR),
+        "multiple": GLib.Variant("b", True),
+        "persist_mode": GLib.Variant("u", PERSIST_UNTIL_REVOKED),
+    }
+    if _cursor_modes(bus, PORTAL, PORTAL_PATH) & EMBEDDED_CURSOR:  # in the video, as x11grab has it
+        options["cursor_mode"] = GLib.Variant("u", EMBEDDED_CURSOR)
+    token = state.load().get("screencast")
+    if token:
+        options["restore_token"] = GLib.Variant("s", token)
+    if portal_request(bus, SCREENCAST, "SelectSources", "(oa{sv})",
+                      (session,), options) is None:
+        raise Refused(NO_PORTAL)
+
+    started = portal_request(bus, SCREENCAST, "Start", "(osa{sv})",
+                             (session, ""), {}, seconds=CHOOSING_SECONDS)
+    if not started:
+        raise Refused(NOT_SHARED)
+    state.remember(screencast=started.get("restore_token"))
+    chosen = stream_for(area, scale, started.get("streams", []))
+    if chosen is None:
+        state.remember(screencast=None)  # so the next one asks again
+        raise Refused(WRONG_SCREEN)
+
+    try:
+        reply, fds = bus.call_with_unix_fd_list_sync(
+            PORTAL, PORTAL_PATH, SCREENCAST, "OpenPipeWireRemote",
+            GLib.Variant("(oa{sv})", (session, {})), GLib.VariantType("(h)"),
+            Gio.DBusCallFlags.NONE, 10000, None, None,
+        )
+        fd = fds.get(reply.unpack()[0])
+    except GLib.Error:
+        raise Refused(NO_PORTAL) from None
+    return (fd,) + chosen
+
+
+def _cursor_modes(bus, portal, portal_path):
+    try:
+        return bus.call_sync(
+            portal, portal_path, "org.freedesktop.DBus.Properties", "Get",
+            GLib.Variant("(ss)", (SCREENCAST, "AvailableCursorModes")),
+            GLib.VariantType("(v)"), Gio.DBusCallFlags.NONE, 5000, None,
+        ).unpack()[0]
+    except GLib.Error:
+        return 0
+
+
+def stream_for(area, scale, streams):
+    """The shared monitor holding the middle of `area`: (node, Rect), or None.
+
+    The portal places each stream in logical pixels on the same layout the
+    overlay was drawn over; `area` is in physical ones, so the stream is
+    scaled to meet it.
+    """
+    middle = (area.x + area.width / 2, area.y + area.height / 2)
+    for node, properties in streams:
+        x, y = properties.get("position", (0, 0))
+        width, height = properties.get("size", (0, 0))
+        where = Rect(x, y, width, height).scaled(scale)
+        if where.contains(*middle):
+            return node, where
+    return None
+
+
+def start(area, options, scale=1.0, wayland=False):
     """Hand `area` to a detached agent, and say where it is being written.
 
     Returns an exit code. `area` is in physical pixels, `scale` the factor
     from logical ones, which the agent needs to place its bar beside it.
     `options.mic` is the source to hear, or None. A GIF has nowhere to put
     sound, so no source is asked of one.
+
+    Under Wayland the agent runs its window through XWayland: a Wayland
+    window cannot choose where it goes, and the bar has to go beside the
+    area, not in it. Without XWayland there is no bar.
     """
     path = destination(options)
     payload = json.dumps({
@@ -210,8 +382,10 @@ def start(area, options, scale=1.0):
         "area": [area.x, area.y, area.width, area.height],
         "scale": scale,
         "mic": None if options.gif else options.mic,
+        "wayland": wayland,
     })
-    if not spawn_detached(["--record-agent", payload]):
+    environment = dict(os.environ, GDK_BACKEND="x11") if wayland else None
+    if not spawn_detached(["--record-agent", payload], environment):
         return 1
     print(path)
     return 0
@@ -530,25 +704,42 @@ def run_agent(payload):
     _create_privately(recorded)
 
     area = _Area(*spec["area"])
+    scale = spec.get("scale") or 1.0
+    line, kept, missing = command(recorded, area, spec.get("mic")), (), MISSING
+    if spec.get("wayland"):
+        try:
+            fd, node, stream = screencast(area, scale)
+        except Refused as refusal:
+            notifications.show_simple("Recording failed", str(refusal))
+            with contextlib.suppress(OSError):
+                os.unlink(recorded)
+            return 1
+        line = screencast_command(recorded, area, fd, node, stream,
+                                  spec.get("mic"))
+        kept, missing = (fd,), NO_GSTREAMER
     errors = tempfile.TemporaryFile()
     try:
         process = subprocess.Popen(
-            command(recorded, area, spec.get("mic")),
+            line,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=errors,
+            pass_fds=kept,
         )
     except OSError:
-        notifications.show_simple("Recording failed", MISSING)
+        notifications.show_simple("Recording failed", missing)
         return 1
 
     state.remember(recording=process.pid)
     loop = GLib.MainLoop()
     notification = notifications.recording_started(stop_running)
     dot = indicator(stop_running)
-    scale = spec.get("scale") or 1.0
-    bar = StopBar(Rect(area.x, area.y, area.width, area.height).scaled(1 / scale),
-                  stop_running)
+    try:
+        bar = StopBar(
+            Rect(area.x, area.y, area.width, area.height).scaled(1 / scale),
+            stop_running)
+    except RuntimeError:  # no X display for it: Wayland without XWayland
+        bar = None
     started = GLib.get_monotonic_time()
 
     def poll():
@@ -558,12 +749,14 @@ def run_agent(payload):
         if process.poll() is not None:
             loop.quit()
             return False
-        bar.tick((GLib.get_monotonic_time() - started) / 1e6)
+        if bar is not None:
+            bar.tick((GLib.get_monotonic_time() - started) / 1e6)
         return True
 
     GLib.timeout_add(POLL_MS, poll)
     loop.run()
-    bar.close()
+    if bar is not None:
+        bar.close()
     _close(notification)
     if dot is not None:
         dot.close()

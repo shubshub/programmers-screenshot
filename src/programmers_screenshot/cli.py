@@ -371,7 +371,8 @@ def _begin_recording(area, pixbuf, bounds, options):
     """
     scale = capture.pixel_scale(pixbuf, bounds)
     return recording.start(
-        recording.area_of(area, bounds, scale), with_preferences(options), scale
+        recording.area_of(area, bounds, scale), with_preferences(options), scale,
+        wayland=not capture.is_x11(Gdk.Display.get_default()),
     )
 
 

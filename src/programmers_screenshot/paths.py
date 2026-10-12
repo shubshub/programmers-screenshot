@@ -27,7 +27,7 @@ def running_program():
     return os.path.abspath(sys.argv[0])
 
 
-def spawn_detached(arguments):
+def spawn_detached(arguments, environment=None):
     """Start a detached copy of ourselves. False if it could not be launched.
 
     Anything that has to outlive this process goes through here: a
@@ -42,6 +42,7 @@ def spawn_detached(arguments):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,  # survives us exiting
+            env=environment,
         )
         return True
     except OSError:
