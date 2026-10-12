@@ -1,3 +1,24 @@
+programmers-screenshot (0.30.0) noble; urgency=medium
+
+  * --record works under Wayland. No program may read the screen there, so
+    the recording goes through the desktop portal's screencast: the portal
+    shares the monitor the area is on as a PipeWire stream, and GStreamer
+    crops it to the area and writes a VP8 WebM, with the microphone as Opus.
+    The record dot and the Mic row now appear under Wayland too.
+  * The desktop asks which screen to share the first time only. It hands
+    back a token that skips the question after that, so a hotkey can still
+    start and stop a recording. An area on a screen that was not shared
+    fails with a notification, and the next recording asks again.
+  * Under Wayland the Stop bar is placed through XWayland, since a Wayland
+    window cannot choose where it goes. Without XWayland there is no bar;
+    the dot in the status area and the second keypress still stop it.
+  * pulseaudio-utils joins Recommends. The Mic row lists microphones with
+    pactl, and stock Ubuntu does not always have it, so the row could be
+    missing with no word as to why. GStreamer's tools, PipeWire source and
+    good plugins join it too, for the Wayland recording.
+
+ -- Shubshub  Mon, 12 Oct 2026 16:51:35 +1300
+
 programmers-screenshot (0.29.0) noble; urgency=medium
 
   * A recording can carry the microphone. Pick one on the Mic row under the
