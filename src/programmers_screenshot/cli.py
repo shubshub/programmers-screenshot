@@ -2,6 +2,7 @@
 
 import argparse
 import collections
+import contextlib
 import copy
 import os
 import sys
@@ -17,7 +18,7 @@ from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 from . import (  # noqa: I101
     alerts, capture, hotkey, notifications, output, paths, preferences, recipe,
-    recording, skill, tools, updates,
+    recording, settings, skill, tools, updates,
 )
 from .geometry import Rect
 from .overlay import Overlay
@@ -93,6 +94,10 @@ def build_parser():
     parser.add_argument(
         "--gif", action="store_true",
         help="with --record, convert the recording to a GIF",
+    )
+    parser.add_argument(
+        "--mic", action="store_true",
+        help="with --record, record the microphone too",
     )
     parser.add_argument(
         "--delay", metavar="SECONDS", type=float, default=0,
@@ -364,9 +369,9 @@ def _begin_recording(area, pixbuf, bounds, options):
     what ffmpeg wants is physical pixels from the corner of the root window,
     and the capture already knows the factor between them.
     """
+    scale = capture.pixel_scale(pixbuf, bounds)
     return recording.start(
-        recording.area_of(area, bounds, capture.pixel_scale(pixbuf, bounds)),
-        with_preferences(options),
+        recording.area_of(area, bounds, scale), with_preferences(options), scale
     )
 
 
@@ -475,7 +480,9 @@ def with_preferences(options):
     a later one.
 
     A flag always wins. Only ever tightens: a stored preference can switch
-    saving off, never back on over --no-save.
+    saving off, never back on over --no-save. The microphone is the one it
+    can switch on: picking one on the toolbar is what the Record button has
+    in place of a --mic.
     """
     stored = preferences.load()
     effective = copy.copy(options)
@@ -485,6 +492,13 @@ def with_preferences(options):
         effective.no_save = True
     if effective.directory is None and stored.get("directory"):
         effective.directory = stored["directory"]
+    # Which microphone: the one picked on the toolbar, else, for a --mic with
+    # nothing picked, whichever the sound settings use.
+    chosen = stored.get("mic")
+    if isinstance(chosen, str):
+        effective.mic = chosen
+    else:
+        effective.mic = "default" if options.mic else None
     return effective
 
 
@@ -501,16 +515,46 @@ def run_overlay(pixbuf, bounds, region_only=False):
     already said so plainly by the time it gets here.
     """
     can_record = recording.unavailable(Gdk.Display.get_default()) is None
+    chosen = [tools.RectangleTool()] if region_only else tools.build_tools()
+    mic = _offer_microphones(chosen) if can_record else None
     overlay = Overlay(
-        pixbuf, bounds,
-        [tools.RectangleTool()] if region_only else tools.build_tools(),
+        pixbuf, bounds, chosen,
         region_only=region_only,
         record=can_record and not region_only,
     )
     result = overlay.run()
+    if mic is not None:
+        # Kept whichever way the overlay closed: it is a choice of microphone,
+        # and the next recording should not have to be told it again.
+        stored = preferences.load()
+        stored["mic"] = overlay.values.get(mic)
+        with contextlib.suppress(OSError):
+            preferences.save(stored)
     if result is None:
         return None
     return Outcome(None, result) if overlay.recording else Outcome(result, None)
+
+
+def _offer_microphones(chosen):
+    """Put a Mic row on the region tool, None and then every input there is.
+
+    On the region tool because that is the one marking out what to record,
+    and it had no row of its own. Starts on the one picked last time, if it
+    is still plugged in. Returns the setting, or None when there is nothing
+    to choose between.
+    """
+    inputs = recording.microphones()
+    if not inputs:
+        return None
+    last = preferences.load().get("mic")
+    mic = settings.TextSetting(
+        "mic", "Mic", last if last in dict(inputs) else None,
+        ((None, "None"),) + inputs,
+    )
+    for tool in chosen:
+        if tool.sets_region:
+            tool.settings = (mic,)
+    return mic
 
 
 def cairo_is_usable():

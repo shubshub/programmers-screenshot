@@ -31,7 +31,7 @@ class Setting:
         """What to call one option, for a tooltip or a drawn label."""
         return str(value)
 
-    def option_width(self):
+    def option_width(self, value=None):
         return theme.SETTINGS_OPTION
 
     def draw_option(self, cr, box, value, active):
@@ -95,6 +95,15 @@ class ChoiceSetting(Setting):
         painting.select_font(cr, theme.FONT_UI, theme.FONT_SIZE_SETTING)
         colour = theme.ACCENT if active else theme.SETTINGS_MARK
         painting.draw_text_centred(cr, self.caption(value), box, colour)
+
+
+class TextSetting(ChoiceSetting):
+    """Segmented buttons as wide as their captions, for names that are not
+    a few letters long -- the microphones, say."""
+
+    def option_width(self, value=None):
+        # Estimated, like the toolbar's labels: there is no cairo context yet.
+        return max(theme.SETTINGS_OPTION, int(len(self.caption(value)) * 6.6) + 14)
 
 
 class WidthSetting(ChoiceSetting):

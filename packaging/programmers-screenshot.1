@@ -62,7 +62,14 @@ do anything is worse than no button at all. Annotations are left behind: a
 recording is of the live screen, and the marks were made on a frozen frame of
 it.
 .SS Stopping one
-While a recording runs, a red dot sits in the desktop's status area \- the top
+While a recording runs, a small bar \- a red dot, the time so far and
+\fBStop\fR \- sits just outside the recorded area: below it, else above or
+beside it. ffmpeg records every pixel in the area and X11 cannot leave a
+window out of that, so the bar is kept out of the area instead and never
+appears in the video. When the area fills every monitor there is nowhere
+for it, and it is not shown.
+.PP
+Also while a recording runs, a red dot sits in the desktop's status area \- the top
 bar, beside the volume and the battery \- carrying one item, \fBStop
 recording\fR. That is the control to reach for. It needs no extra package \-
 .B StatusNotifierItem
@@ -327,6 +334,17 @@ With
 .BR \-\-record ,
 convert the finished recording to an animated GIF and keep that instead. Larger
 and lossier than the WebM; most things that take a GIF take a WebM.
+.TP
+.B \-\-mic
+With
+.BR \-\-record ,
+record the microphone too, as Opus in the same WebM. The microphone is the
+one picked on the \fBMic\fR row under the toolbar, which appears with the
+Region tool when recording is possible and lists \fBNone\fR and then every
+input PulseAudio or PipeWire reports; it is remembered. With nothing picked,
+the desktop's default input. Ignored with
+.BR \-\-gif ,
+which has no sound.
 .TP
 .BR \-\-delay " " \fISECONDS\fR
 Wait before the screen is read, so a menu or a hover state can be set up

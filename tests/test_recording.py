@@ -21,15 +21,17 @@ from checker import Checker  # noqa: E402
 
 from gi.repository import GLib  # noqa: E402
 
-from programmers_screenshot import cli, recording, state  # noqa: E402
+from programmers_screenshot import cli, preferences, recording, state  # noqa: E402
+from programmers_screenshot.geometry import Rect  # noqa: E402
 
 CONFIG = tempfile.mkdtemp(prefix="programmers-screenshot-recording-")
 state.path = lambda: os.path.join(CONFIG, "state.json")
+preferences.path = lambda: os.path.join(CONFIG, "preferences.json")
 
 
 def options(**overrides):
     """The handful of fields the recorder reads off the parsed command line."""
-    values = {"directory": None, "output": None, "gif": False}
+    values = {"directory": None, "output": None, "gif": False, "mic": False}
     values.update(overrides)
     return types.SimpleNamespace(**values)
 
@@ -125,6 +127,118 @@ def main():
           "-nostdin" in line)
     check("the file it writes is the last word", line[-1] == "/tmp/out.webm",
           line[-1])
+    check("without --mic there is no sound", "pulse" not in line, line)
+
+    heard = recording.command("/tmp/out.webm", recording.area_of(
+        rect(10, 20, 300, 200), screen, 1.0), mic="alsa_input.usb-mic")
+    inputs = [heard[i + 1] for i, word in enumerate(heard) if word == "-i"]
+    check("a microphone is a second input, through pulse, by its name",
+          inputs == [":9+10,20", "alsa_input.usb-mic"] and "pulse" in heard,
+          inputs)
+    check("the sound is Opus, which WebM carries",
+          dict(zip(heard, heard[1:])).get("-c:a") == "libopus")
+    check("and the file is still the last word", heard[-1] == "/tmp/out.webm")
+
+    # ----------------------------------------------------------------------
+    check.section("the microphones offered on the toolbar")
+
+    # The two on the machine this was written on: one sound card, so the
+    # descriptions differ only in the middle.
+    captions = recording._captions([
+        "Family 17h/19h HD Audio Controller Headphones Stereo Microphone",
+        "Family 17h/19h HD Audio Controller Digital Microphone",
+    ])
+    check("what they share is dropped, front and back",
+          captions == ["Headphones Stereo", "Digital"], captions)
+    check("one on its own keeps its whole name",
+          recording._captions(["USB Microphone"]) == ["USB Microphone"])
+    check("identical names are left whole rather than emptied",
+          recording._captions(["Mic", "Mic"]) == ["Mic", "Mic"])
+    long = recording._captions(["A microphone with a very long name indeed"])[0]
+    check("a long one is cut to fit the toolbar",
+          len(long) <= recording.CAPTION_LENGTH and long.endswith("\u2026"), long)
+
+    listed = """[
+      {"name": "alsa_output.speakers.monitor", "description": "Monitor of Speakers",
+       "properties": {"device.class": "monitor"}},
+      {"name": "alsa_input.usb-mic", "description": "Blue Yeti",
+       "properties": {"device.class": "sound"}}
+    ]"""
+    real_run = subprocess.run
+    try:
+        subprocess.run = lambda *_a, **_k: types.SimpleNamespace(stdout=listed)
+        check("the speakers' monitor is not offered as a microphone",
+              recording.microphones() == (("alsa_input.usb-mic", "Blue Yeti"),),
+              recording.microphones())
+        subprocess.run = lambda *_a, **_k: types.SimpleNamespace(stdout="")
+        check("nothing said means nothing offered", recording.microphones() == ())
+
+        def missing(*_args, **_kwargs):
+            raise FileNotFoundError("pactl")
+
+        subprocess.run = missing
+        check("and so does no pactl", recording.microphones() == ())
+    finally:
+        subprocess.run = real_run
+
+    def heard(argv, stored):
+        preferences.save(dict(preferences.DEFAULTS, mic=stored))
+        return cli.with_preferences(cli.build_parser().parse_args(argv)).mic
+
+    check("the one picked on the toolbar is the one heard",
+          heard(["--record"], "alsa_input.usb-mic") == "alsa_input.usb-mic")
+    check("None picked is silence", heard(["--record"], None) is None)
+    check("--mic with none picked is the desktop's default",
+          heard(["--record", "--mic"], None) == "default")
+    check("but --mic does not override which one was picked",
+          heard(["--record", "--mic"], "alsa_input.usb-mic") == "alsa_input.usb-mic")
+
+    # ----------------------------------------------------------------------
+    check.section("the Stop bar stays out of the recorded area")
+    # x11grab records every pixel in the area, the bar's too if it were there.
+
+    single = [Rect(0, 0, 1920, 1080)]
+    bar = (200, 40)
+    gap = recording.BAR_GAP
+    where = recording.bar_position(Rect(100, 100, 400, 300), single, bar)
+    check("below the area, centred on it",
+          where == (200, 400 + gap), where)
+
+    where = recording.bar_position(Rect(0, 900, 300, 170), single, bar)
+    check("above it when there is no room below",
+          where == (50, 900 - gap - 40), where)
+    check("slid along the edge rather than off the screen", where[0] >= 0, where)
+
+    where = recording.bar_position(Rect(0, 0, 1000, 1080), single, bar)
+    check("beside it when it is the full height",
+          where == (1000 + gap, 520), where)
+
+    where = recording.bar_position(Rect(0, 0, 1920, 1080), single, bar)
+    check("nowhere when it fills the only monitor", where is None, where)
+
+    pair = [Rect(0, 0, 1920, 1080), Rect(1920, 0, 1920, 1080)]
+    where = recording.bar_position(Rect(0, 0, 1920, 1080), pair, bar)
+    check("on the other monitor when it fills one",
+          where is not None and where[0] >= 1920, where)
+
+    # The machine this was found on: a second monitor listed first, and the
+    # bar clamped onto it, three thousand pixels from the area it belonged to.
+    pair = [Rect(3440, 240, 1920, 1200), Rect(0, 0, 3440, 1440)]
+    where = recording.bar_position(Rect(100, 100, 400, 300), pair, bar)
+    check("next to the area when its own monitor has room, whatever the order",
+          where == (200, 400 + gap), where)
+
+    stopped = []
+    shown = recording.StopBar(Rect(100, 100, 400, 300), lambda: stopped.append(1))
+    buttons = [child for child in shown.window.get_child().get_children()
+               if child.get_label() == "Stop"]
+    check("the bar has a Stop button", len(buttons) == 1, buttons)
+    buttons[0].clicked()
+    check("and pressing it stops the recording", stopped == [1], stopped)
+    shown.tick(75)
+    check("the clock reads minutes and seconds",
+          shown.clock.get_text() == "1:15", shown.clock.get_text())
+    shown.close()
 
     # ----------------------------------------------------------------------
     check.section("where the recording lands")
@@ -275,7 +389,9 @@ def main():
 
     check("--record", flag(["--record"], "record") is True)
     check("--gif", flag(["--record", "--gif"], "gif") is True)
-    check("neither is on by default", flag([], "record") is False)
+    check("--mic", flag(["--record", "--mic"], "mic") is True)
+    check("none is on by default",
+          flag([], "record") is False and flag([], "mic") is False)
     check("the agent is internal but reachable",
           flag(["--record-agent", "{}"], "record_agent") == "{}")
 

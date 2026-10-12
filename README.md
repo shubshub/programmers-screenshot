@@ -131,6 +131,7 @@ square, the rectangle too, and lines and arrows snap to 45° angles.
     --region X,Y,W,H    capture that area, no overlay
     --record            record a region to WebM; run again to stop
     --gif               with --record, keep a GIF instead
+    --mic               with --record, record the microphone too
     --delay SECONDS     wait before the screen is read
     --recipe FILE       take the shot a JSON recipe describes ("-" is stdin)
     --recipe-help       print what a recipe can describe, and exit
@@ -268,7 +269,20 @@ Enter) starts recording instead of taking a shot. The command exits
 immediately, printing the path it is filling, so binding one key to
 `--record` gives you start and stop on that key.
 
-While it runs there is a red dot in the desktop's status area — the top bar,
+While it runs a small bar — a red dot, the time so far, and **Stop** — sits
+just outside the recorded area, below it if there is room, else above or
+beside it. Outside, because ffmpeg records every pixel in the area and X11
+has no way to leave one window out of that; the bar is never in the video.
+If the area fills every monitor there is nowhere for it to go unseen, so it
+is not shown, and the controls below are still there.
+
+To record sound as well, pick a microphone on the **Mic** row under the
+toolbar while the Region tool is active: **None**, then every input PulseAudio
+or PipeWire reports. The choice is remembered for next time. `--mic` with
+nothing picked uses whichever microphone the sound settings have chosen. The
+sound goes into the same WebM as Opus; a GIF has none, so `--gif` is silent.
+
+There is also a red dot in the desktop's status area — the top bar,
 beside the volume and the battery — and **Stop recording** on it ends the
 recording. That is where you look for something that is currently happening.
 

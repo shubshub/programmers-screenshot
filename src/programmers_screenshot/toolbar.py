@@ -257,7 +257,7 @@ class Toolbar:
         for setting in settings:
             x += self._label_width(setting) + 8
             for value in setting.options():
-                width = setting.option_width()
+                width = setting.option_width(value)
                 self.setting_buttons.append(
                     Button(
                         SETTING,
@@ -744,23 +744,30 @@ class PaletteToolbar(Toolbar):
 
         pad = theme.PALETTE_PADDING
         step = theme.SETTINGS_OPTION + theme.SETTINGS_OPTION_GAP
-        rows = len(settings)
-        height = pad * 2 + rows * step - theme.SETTINGS_OPTION_GAP
+        left, right = self.rect.x + pad, self.rect.right - pad
+        top = self.rect.bottom + pad
 
-        self.settings_rect = Rect(
-            self.rect.x, self.rect.bottom, self.rect.width, height
-        )
         self.setting_buttons = []
-        for row, setting in enumerate(settings):
-            x = self.settings_rect.x + pad
-            y = self.settings_rect.y + pad + row * step
+        row = 0
+        for setting in settings:
+            x = left
             for value in setting.options():
-                width = setting.option_width()
+                width = setting.option_width(value)
+                # Wider options than the palette is, a microphone's name, go
+                # on to the next line rather than off the edge.
+                if x > left and x + width > right:
+                    x, row = left, row + 1
                 self.setting_buttons.append(Button(
-                    SETTING, Rect(x, y, width, theme.SETTINGS_OPTION),
+                    SETTING, Rect(x, top + row * step, width, theme.SETTINGS_OPTION),
                     setting=setting, value=value,
                 ))
                 x += width + theme.SETTINGS_OPTION_GAP
+            row += 1
+
+        height = pad * 2 + row * step - theme.SETTINGS_OPTION_GAP
+        self.settings_rect = Rect(
+            self.rect.x, self.rect.bottom, self.rect.width, height
+        )
 
     def draw(self, cr, active_tool):
         painting.fill_rounded(cr, self.whole(), theme.BAR_BG, 6)

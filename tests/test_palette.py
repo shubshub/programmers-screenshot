@@ -22,7 +22,7 @@ from support import Checker, Harness  # noqa: E402
 from programmers_screenshot import capture, preferences, theme  # noqa: E402
 from programmers_screenshot import toolbar as tb  # noqa: E402
 from programmers_screenshot.geometry import Rect  # noqa: E402
-from programmers_screenshot.settings import SettingValues  # noqa: E402
+from programmers_screenshot.settings import SettingValues, TextSetting  # noqa: E402
 from programmers_screenshot.tools import build_tools  # noqa: E402
 
 MONITOR = Rect(0, 0, 1920, 1080)
@@ -331,6 +331,31 @@ def main():
                  if b.kind == tb.TOOL and b.tool.name == "eraser")
     check("no members", plain.members is None)
     check("and nothing behind it", not tb.Toolbar.has_flyout(plain))
+
+    check.section("options too wide for one line of the palette wrap")
+    # The microphones: names, not swatches, and more than fit side by side.
+    mic = TextSetting("mic", "Mic", None, (
+        (None, "None"), ("a", "Headphones Stereo"), ("b", "Digital"),
+        ("c", "Some USB Microphone"),
+    ))
+    region = types.SimpleNamespace(settings=(mic,))
+    palette = bars(tb.PALETTE).palette
+    palette.show_settings_for(region)
+    options = palette.setting_buttons
+    check("a name is wider than a swatch",
+          options[1].rect.width > theme.SETTINGS_OPTION, options[1].rect.width)
+    check("every option stays inside the palette",
+          all(palette.rect.x <= b.rect.x and b.rect.right <= palette.rect.right
+              for b in options), [b.rect for b in options])
+    check("so they take more than one line",
+          len({b.rect.y for b in options}) > 1, [b.rect.y for b in options])
+    check("and the block underneath grows to hold them",
+          all(b.rect.bottom <= palette.settings_rect.bottom for b in options))
+
+    bar = bars(tb.BAR).bars[0]
+    bar.show_settings_for(region)
+    check("on the bar they fit on its one row",
+          len({b.rect.y for b in bar.setting_buttons}) == 1)
 
     check.section("the preference decides which you get")
     check("bar is the default", preferences.DEFAULTS["toolbar"] == tb.BAR,

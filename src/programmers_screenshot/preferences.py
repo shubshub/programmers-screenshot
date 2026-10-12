@@ -4,10 +4,12 @@ Distinct from settings.py: those are the per-tool knobs on the second toolbar
 row, chosen per gesture and forgotten when the overlay closes. These outlive
 the session and live in a file.
 
-Six of them: whether a capture is saved and to which folder, how the toolbar
-is presented and where the palette was last dropped, whether GitHub is asked
-about new releases, and whether a recipe may take a shot with nobody
-watching. A flag always beats what is stored here; see cli.with_preferences.
+Seven of them: whether a capture is saved and to which folder, how the
+toolbar is presented and where the palette was last dropped, whether GitHub
+is asked about new releases, whether a recipe may take a shot with nobody
+watching, and which microphone a recording hears -- that one picked on the
+toolbar's Mic row rather than here. A flag always beats what is stored
+here; see cli.with_preferences.
 """
 
 import gi
@@ -38,6 +40,9 @@ DEFAULTS = {
     # Print Screen knows what is on their screen, and something running a
     # recipe does not.
     "scripted": False,
+    # The pulse source a recording hears, as picked on the toolbar. None is
+    # silence.
+    "mic": None,
 }
 
 
