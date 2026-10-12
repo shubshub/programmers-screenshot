@@ -25,6 +25,7 @@ import tempfile
 from gi.repository import Gio, GLib
 
 from . import notifications, output, state
+from .geometry import Rect
 from .paths import spawn_detached
 
 PROGRAM = "ffmpeg"
@@ -111,20 +112,83 @@ def destination(options):
     )
 
 
-def command(path, area):
+CAPTION_LENGTH = 26  # what still fits a palette's width, one to a line
+
+
+def microphones():
+    """The sound inputs to offer, as ((source name, caption), ...).
+
+    Asked of pactl, which PipeWire answers as well as PulseAudio does. Empty
+    when it is not there or says nothing, and then nobody is offered a
+    choice. The monitors are left out: they are what the speakers are
+    playing, not a microphone.
+    """
+    try:
+        listed = subprocess.run(
+            ["pactl", "-f", "json", "list", "sources"], capture_output=True,
+            text=True, timeout=3, check=False,
+        ).stdout
+        sources = json.loads(listed or "[]")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return ()
+    inputs = [
+        (source["name"], source.get("description") or source["name"])
+        for source in sources
+        if source.get("properties", {}).get("device.class") != "monitor"
+    ]
+    return tuple(zip([name for name, _ in inputs], _captions(
+        [description for _, description in inputs])))
+
+
+def _captions(descriptions):
+    """Short enough for the toolbar, and still telling them apart.
+
+    Two microphones on one sound card share most of their description --
+    "Family 17h/19h HD Audio Controller Digital Microphone" and the same
+    with "Headphones Stereo" -- so the words they all begin and end with go,
+    and "Digital" and "Headphones Stereo" are left.
+    """
+    words = [description.split() for description in descriptions]
+    if len(words) > 1:
+        for end in (0, -1):  # the front, then the back
+            while all(len(each) > 1 for each in words) and \
+                    len({each[end] for each in words}) == 1:
+                for each in words:
+                    del each[end]
+    captions = []
+    for each in words:
+        caption = " ".join(each)
+        if len(caption) > CAPTION_LENGTH:
+            caption = caption[:CAPTION_LENGTH - 1].rstrip() + "\u2026"
+        captions.append(caption)
+    return captions
+
+
+def command(path, area, mic=None):
     """The ffmpeg that fills `path` from `area` of the X display.
 
     `area` is in physical pixels, which is what x11grab addresses -- the
     caller has already multiplied by the display scale. Realtime VP9: the
     default deadline is tuned for encoding a film overnight and drops most of
     the frames of a large region when it has to keep up with one.
+
+    With `mic`, the name of a pulse source -- or "default", whichever the
+    sound settings have picked -- that input joins it as Opus. Through
+    pulse, which PipeWire speaks too.
     """
-    return [
+    line = [
         PROGRAM, "-nostdin", "-loglevel", "error", "-y",
         "-f", "x11grab",
         "-framerate", str(FRAMERATE),
         "-video_size", "%dx%d" % (area.width, area.height),
         "-i", "%s+%d,%d" % (os.environ.get("DISPLAY") or ":0", area.x, area.y),
+    ]
+    if mic:
+        # The queue is for the encoder falling behind: VP9 at a large size
+        # can, and a full queue drops sound rather than waits.
+        line += ["-f", "pulse", "-thread_queue_size", "1024", "-i", mic,
+                 "-c:a", "libopus"]
+    return line + [
         "-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p",
         "-deadline", "realtime", "-cpu-used", "4",
         "-b:v", "0", "-crf", "31",
@@ -132,14 +196,21 @@ def command(path, area):
     ]
 
 
-def start(area, options):
+def start(area, options, scale=1.0):
     """Hand `area` to a detached agent, and say where it is being written.
 
-    Returns an exit code. `area` is in physical pixels.
+    Returns an exit code. `area` is in physical pixels, `scale` the factor
+    from logical ones, which the agent needs to place its bar beside it.
+    `options.mic` is the source to hear, or None. A GIF has nowhere to put
+    sound, so no source is asked of one.
     """
     path = destination(options)
-    payload = json.dumps({"path": path, "area": [area.x, area.y, area.width,
-                                                 area.height]})
+    payload = json.dumps({
+        "path": path,
+        "area": [area.x, area.y, area.width, area.height],
+        "scale": scale,
+        "mic": None if options.gif else options.mic,
+    })
     if not spawn_detached(["--record-agent", payload]):
         return 1
     print(path)
@@ -365,6 +436,86 @@ def indicator(on_stop):
     return dot if dot.show() else None
 
 
+BAR_GAP = 8  # logical pixels between the recorded area and the bar
+
+
+def bar_position(region, monitors, size, gap=BAR_GAP):
+    """Where a bar of `size` can sit on screen without being in `region`.
+
+    x11grab records whatever is on screen there, and X11 has no way to leave
+    a window out of a grab, so the only way to keep the bar out of the video
+    is to keep it out of the area. Below first, where a toolbar is expected,
+    then above, right and left, each slid along its edge to stay on the
+    monitor. The area's own monitor is tried first, so the bar is not sent
+    to the far side of another one while there is room next to the area.
+    None when the area leaves no room on any of them.
+    """
+    width, height = size
+    centre_x = region.x + (region.width - width) / 2
+    centre_y = region.y + (region.height - height) / 2
+    sides = (
+        (centre_x, region.bottom + gap, True),
+        (centre_x, region.y - gap - height, True),
+        (region.right + gap, centre_y, False),
+        (region.x - gap - width, centre_y, False),
+    )
+    middle = (region.x + region.width / 2, region.y + region.height / 2)
+    nearest = sorted(monitors, key=lambda monitor: not monitor.contains(*middle))
+    for monitor in nearest:
+        for side_x, side_y, along_x in sides:
+            x, y = side_x, side_y
+            if along_x:
+                x = min(max(x, monitor.x), monitor.right - width)
+            else:
+                y = min(max(y, monitor.y), monitor.bottom - height)
+            if (monitor.x <= x and x + width <= monitor.right
+                    and monitor.y <= y and y + height <= monitor.bottom):
+                return int(x), int(y)
+    return None
+
+
+class StopBar:
+    """A dot, how long it has been going, and Stop, just outside the area.
+
+    A popup window, so no window manager decorates it, moves it or puts it
+    in the task list, and it never takes focus from what is being recorded.
+    Gtk is imported here rather than at the top: this module is also what a
+    second --record loads to stop the first, and that needs no display.
+    """
+
+    def __init__(self, region, on_stop):
+        from gi.repository import Gdk, Gtk
+
+        from .capture import monitor_rects
+
+        self.window = Gtk.Window(type=Gtk.WindowType.POPUP)
+        self.clock = Gtk.Label(label="0:00")
+        stop = Gtk.Button(label="Stop")
+        stop.connect("clicked", lambda *_: on_stop())
+        dot = Gtk.Label()
+        dot.set_markup('<span foreground="#e83d3d">\u25cf</span>')
+        row = Gtk.Box(spacing=8, margin=6)
+        for widget in (dot, self.clock, stop):
+            row.pack_start(widget, False, False, 0)
+        self.window.add(row)
+        row.show_all()
+
+        natural = self.window.get_preferred_size()[1]
+        self.position = bar_position(
+            region, monitor_rects(Gdk.Display.get_default()),
+            (natural.width, natural.height),
+        )
+        if self.position is not None:
+            self.window.move(*self.position)
+            self.window.show()
+
+    def tick(self, seconds):
+        self.clock.set_text("%d:%02d" % divmod(int(seconds), 60))
+
+    def close(self):
+        self.window.destroy()
+
+
 def run_agent(payload):
     """Record until somebody stops it, then finish the file and announce it."""
     spec = json.loads(payload)
@@ -378,10 +529,11 @@ def run_agent(payload):
     # for the whole recording. What lands in it is somebody's screen.
     _create_privately(recorded)
 
+    area = _Area(*spec["area"])
     errors = tempfile.TemporaryFile()
     try:
         process = subprocess.Popen(
-            command(recorded, _Area(*spec["area"])),
+            command(recorded, area, spec.get("mic")),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=errors,
@@ -392,13 +544,26 @@ def run_agent(payload):
 
     state.remember(recording=process.pid)
     loop = GLib.MainLoop()
-    # A poll rather than a child watch, which would reap the process out from
-    # under Popen. A second's lag on a recording somebody just stopped is not
-    # something anybody can see.
-    GLib.timeout_add(POLL_MS, lambda: loop.quit() if process.poll() is not None else True)
     notification = notifications.recording_started(stop_running)
     dot = indicator(stop_running)
+    scale = spec.get("scale") or 1.0
+    bar = StopBar(Rect(area.x, area.y, area.width, area.height).scaled(1 / scale),
+                  stop_running)
+    started = GLib.get_monotonic_time()
+
+    def poll():
+        """A poll rather than a child watch, which would reap the process out
+        from under Popen. A second's lag on a recording somebody just stopped
+        is not something anybody can see."""
+        if process.poll() is not None:
+            loop.quit()
+            return False
+        bar.tick((GLib.get_monotonic_time() - started) / 1e6)
+        return True
+
+    GLib.timeout_add(POLL_MS, poll)
     loop.run()
+    bar.close()
     _close(notification)
     if dot is not None:
         dot.close()
