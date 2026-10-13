@@ -16,7 +16,7 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 from support import Checker, Harness, pixel  # noqa: E402
 
 from programmers_screenshot import capture  # noqa: E402
-from programmers_screenshot.actions import SetRegion  # noqa: E402
+from programmers_screenshot.actions import AddItem, SetRegion  # noqa: E402
 from programmers_screenshot.geometry import Rect  # noqa: E402
 from programmers_screenshot.settings import COLOUR  # noqa: E402
 from programmers_screenshot.tools.text import (  # noqa: E402
@@ -113,6 +113,46 @@ def main():
     check("one text item", len(texts(h)) == 1, texts(h))
     check("with both lines", texts(h)[0] == ("hello", "world"), texts(h)[0])
     check("and a fresh caret at the new point", h.overlay.active_tool.editing)
+
+    check.section("clicking a text block reopens it for editing")
+    h = typing()
+    h.click(x, y)
+    h.type_text("helo")
+    h.click(x + 600, y + 400)
+    original = h.items[0]
+    edit_point = (x + PADDING + 2, y + PADDING + 2)
+    h.click(*edit_point)
+    check("the original is hidden while editing", h.items == [], h.items)
+    check("the old text is loaded", h.overlay.active_tool._lines == ["helo"],
+          h.overlay.active_tool._lines)
+    h.key("BackSpace")
+    h.key("BackSpace")
+    h.key("BackSpace")
+    h.key("BackSpace")
+    h.type_text("hello")
+    h.click(x + 600, y + 400)
+    check("the edited text replaces the original", texts(h) == [("hello",)], texts(h))
+    h.key("Escape")
+    h.key("z", control=True)
+    check("one undo restores the original", h.items == [original], h.items)
+    check("the original keeps its position", h.items[0] is original)
+    h.key("z", control=True)
+    check("a second undo removes the original", not h.items, h.items)
+
+    check.section("re-editing chooses the topmost block and Escape is not an undo")
+    h = typing()
+    back = TextBlock((x, y), ("back",), RED, 20, False)
+    front = TextBlock((x, y), ("front",), (0.1, 0.2, 0.8), 28, True)
+    h.overlay.scene.do(AddItem(back))
+    h.overlay.scene.do(AddItem(front))
+    history_before_edit = len(h.overlay.scene._done)
+    h.click(*edit_point)
+    check("the topmost block is the one being edited", h.overlay.active_tool._lines == ["front"],
+          h.overlay.active_tool._lines)
+    check("the lower block remains visible", h.items == [back], h.items)
+    h.key("Escape")
+    check("Escape restores the edited block", h.items == [back, front], h.items)
+    check("Escape adds no undo entry", len(h.overlay.scene._done) == history_before_edit)
 
     check.section("an empty box commits nothing")
     h = typing()
