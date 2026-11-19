@@ -1,5 +1,8 @@
 # programmers-screenshot
 
+The native Android APK port lives in [`android/`](android/README.md), including
+Samsung Side/Power + Volume Up shortcut setup and build instructions.
+
 A minimal region screenshot tool for Ubuntu, built to sit on a single keypress.
 
 Press the hotkey and the screen freezes and dims, with a toolbar across the top.

@@ -1,0 +1,3 @@
+<resources>
+    <string name="service_description">Captures the screen only when you invoke the shortcut or Capture button, then opens the local screenshot editor. Does not read UI text, monitor typing, or use the network. On Samsung, assign this service to Side and Volume up buttons in Accessibility → Advanced settings.</string>
+</resources>

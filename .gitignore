@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 /.claude/
 *.REAL-DO-NOT-COMMIT.*
+**/.gradle/
+**/build/
+**/local.properties
+*.jks
