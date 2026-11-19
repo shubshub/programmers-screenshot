@@ -1,3 +1,19 @@
+programmers-screenshot (0.31.0) noble; urgency=medium
+
+  * Release the PC package alongside the first native Android APK, with a
+    shared version. The desktop capture and recording behaviour is unchanged.
+  * Android: screenshot capture through a user-enabled accessibility service,
+    Samsung Side/Power + Volume Up shortcut, and a Quick Settings tile.
+  * Android: region cropping, drawing, shapes, measurement, colour picking,
+    redaction, pixelation, steps and text, with undo/redo and PNG save/share.
+  * Android: One UI-inspired light/dark styling and labelled, equally sized
+    controls in scrollable side panels, hidden until opened by edge swipes
+    or their reveal buttons.
+  * Build and validate a release-signed APK alongside the Debian package;
+    publish both packages and SHA-256 checksums in the same release.
+
+ -- Shubshub  Thu, 19 Nov 2026 10:38:00 +0000
+
 programmers-screenshot (0.30.0) noble; urgency=medium
 
   * --record works under Wayland. No program may read the screen there, so

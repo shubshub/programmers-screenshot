@@ -14,8 +14,31 @@ cd android
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The APK is debug-signed for local installation. For distribution, configure a
-private release signing key in Android Studio; do not commit signing secrets.
+The APK above is debug-signed for local development. Published releases use
+a separate private signing key. To build the distributable APK:
+
+```sh
+export SCREENSHOT_KEYSTORE=/absolute/private/path/release.jks
+export SCREENSHOT_KEYSTORE_PASSWORD_FILE=/absolute/private/path/keystore-password
+./gradlew assembleRelease lintRelease
+```
+
+The keystore alias must be `programmers-screenshot`; the key password matches
+the keystore password. Keep the keystore and password file outside the repo,
+readable only by their owner, and back them up securely. Future APK updates
+must use the same signing key. Signing material is never uploaded as a release
+asset. `app/build/outputs/apk/release/app-release.apk` is the signed output.
+
+The shared PC/Android release can be validated and published from an up-to-date,
+clean `main` checkout using `xvfb-run -a ./release.sh --android --publish`, with
+the signing variables and `ANDROID_HOME` set. It publishes the `.deb`, signed
+APK, and `SHA256SUMS` under the shared version tag.
+
+If you installed an earlier development APK, Android will reject an update
+signed with the release key. Uninstall the development app before installing
+the published APK, then enable its accessibility service and shortcut again.
+This discards pending edits and private app data; PNGs already saved to Pictures
+remain in the gallery. Updates between published APKs do not require uninstalling.
 
 ## Power / Side + Volume Up on Samsung
 

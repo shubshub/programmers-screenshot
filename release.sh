@@ -5,6 +5,7 @@
 #   ./release.sh --tag        ...and create the annotated tag
 #   ./release.sh --tag --push ...and push it
 #   ./release.sh --publish    ...and make a GitHub release with the .deb
+#   ./release.sh --android --publish  ...with a signed Android APK too
 #
 # Safe by default: without a flag it only reads, builds into dist/, and tells
 # you whether the thing is fit to ship. Anything that leaves this machine is
@@ -19,6 +20,7 @@ WANT_TAG=0
 WANT_PUSH=0
 WANT_PUBLISH=0
 ALLOW_DIRTY=0
+WANT_ANDROID=0
 
 for argument in "$@"; do
     case "$argument" in
@@ -26,6 +28,7 @@ for argument in "$@"; do
         --push) WANT_TAG=1; WANT_PUSH=1 ;;
         --publish) WANT_TAG=1; WANT_PUSH=1; WANT_PUBLISH=1 ;;
         --allow-dirty) ALLOW_DIRTY=1 ;;
+        --android) WANT_ANDROID=1 ;;
         -h|--help) sed -n '2,12p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *) echo "unknown option: $argument" >&2; exit 2 ;;
     esac
@@ -191,12 +194,39 @@ else
     note "lintian not installed — sudo apt install lintian to check the packaging"
 fi
 
+# --- Android, when requested ------------------------------------------------
+ASSETS=("$DEB")
+if [ "$WANT_ANDROID" = 1 ]; then
+    step "Android release APK"
+    android_version="$(sed -n "s/^[[:space:]]*versionName '\([^']*\)'/\1/p" android/app/build.gradle)"
+    [ "$android_version" = "$VERSION" ] && ok "Android version agrees" || bad "Android is $android_version, PC is $VERSION"
+    if [ ! -f "${SCREENSHOT_KEYSTORE:-}" ] || [ ! -f "${SCREENSHOT_KEYSTORE_PASSWORD_FILE:-}" ]; then
+        bad "set SCREENSHOT_KEYSTORE and SCREENSHOT_KEYSTORE_PASSWORD_FILE to private release signing files"
+    else
+        (cd android && ./gradlew assembleRelease assembleDebugAndroidTest lintRelease)
+        APK="dist/${PACKAGE}_${VERSION}_android.apk"
+        cp android/app/build/outputs/apk/release/app-release.apk "$APK"
+        sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+        signer="$sdk_root/build-tools/35.0.0/apksigner"
+        if [ -x "$signer" ] && "$signer" verify "$APK"; then
+            ok "release APK signature verifies"
+        else
+            bad "APK signature verification failed (requires Android build-tools 35.0.0)"
+        fi
+        ASSETS+=("$APK")
+    fi
+fi
+
 # --- verdict ----------------------------------------------------------------
 if [ "$problems" -gt 0 ]; then
     printf '\n\033[1m%d problem(s). Not releasing.\033[0m\n' "$problems"
     exit 1
 fi
 printf '\n\033[1mReady: %s\033[0m\n' "$DEB"
+if [ "$WANT_ANDROID" = 1 ]; then
+    (cd dist && sha256sum "${PACKAGE}_${VERSION}_all.deb" "${PACKAGE}_${VERSION}_android.apk" > SHA256SUMS)
+    ASSETS+=(dist/SHA256SUMS)
+fi
 
 # --- 8. tag and publish, only when asked ------------------------------------
 if [ "$WANT_TAG" = 1 ]; then
@@ -215,7 +245,13 @@ if [ "$WANT_PUBLISH" = 1 ]; then
     step "Publishing"
     notes="$(mktemp)"
     awk 'NR>1 && /^programmers-screenshot \(/ {exit} {print}' packaging/changelog > "$notes"
-    gh release create "v$VERSION" "$DEB" --title "$PACKAGE $VERSION" --notes-file "$notes"
+    if [ "$WANT_ANDROID" = 1 ]; then
+        printf '\nAssets: .deb for Linux PCs, signed APK for Android 11+, and SHA256SUMS.\nAndroid shortcut setup and platform scope: https://github.com/shubshub/programmers-screenshot/blob/v%s/android/README.md\n' "$VERSION" >> "$notes"
+        printf '\nIf upgrading from a development APK, uninstall it first because the published APK uses a separate release signing key. This discards pending edits/private app data; saved PNGs remain in Pictures. Re-enable screenshot access and the shortcut after installing. Future published APKs will use this same release key.\n' >> "$notes"
+    fi
+    title="$PACKAGE $VERSION"
+    [ "$WANT_ANDROID" = 0 ] || title="$title — PC and Android"
+    gh release create "v$VERSION" "${ASSETS[@]}" --title "$title" --notes-file "$notes"
     rm -f "$notes"
     ok "published"
 fi
